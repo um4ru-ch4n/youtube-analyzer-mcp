@@ -13,7 +13,7 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 
 	"github.com/um4ru-ch4n/youtube-analyzer-mcp/internal/config"
-	mcphandler "github.com/um4ru-ch4n/youtube-analyzer-mcp/internal/handler/mcp"
+	"github.com/um4ru-ch4n/youtube-analyzer-mcp/internal/container"
 	"github.com/um4ru-ch4n/youtube-analyzer-mcp/pkg/logger"
 )
 
@@ -23,9 +23,23 @@ const (
 )
 
 func Run(cfg *config.Config, env *config.EnvConfig) {
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-	s := newMCPServer(cfg, env)
+	c, err := container.New(cfg, env)
+	if err != nil {
+		logger.Fatalf(ctx, "failed to create container: %v", err)
+	}
+	defer func() {
+		if closeErr := c.Close(); closeErr != nil {
+			logger.ErrorKV(ctx, "container close error", "error", closeErr.Error())
+		}
+	}()
+
+	// Start background workers.
+	c.TaskManager.Start(ctx)
+
+	s := newMCPServer(c)
 
 	if env.IsHTTPMode() {
 		runHTTP(ctx, s, cfg, env)
@@ -35,24 +49,16 @@ func Run(cfg *config.Config, env *config.EnvConfig) {
 	runStdio(ctx, s)
 }
 
-func newMCPServer(cfg *config.Config, env *config.EnvConfig) *server.MCPServer {
+func newMCPServer(c *container.Container) *server.MCPServer {
 	s := server.NewMCPServer(
 		serverName,
 		serverVersion,
 		server.WithToolCapabilities(false),
 	)
 
-	registerTools(s, cfg, env)
+	c.Handler.RegisterTools(s)
 
 	return s
-}
-
-func registerTools(s *server.MCPServer, _ *config.Config, _ *config.EnvConfig) {
-	// TODO: replace nil with real TaskService once service/task is implemented
-	var taskService mcphandler.TaskService
-
-	handler := mcphandler.New(taskService)
-	handler.RegisterTools(s)
 }
 
 func runStdio(_ context.Context, s *server.MCPServer) {
@@ -129,4 +135,3 @@ func writeJSONError(w http.ResponseWriter, code int, message string) {
 		"id":      nil,
 	})
 }
-

@@ -157,6 +157,33 @@ func (r *Repository) SaveResult(ctx context.Context, taskID string, result model
 	return checkRowsAffected(res, taskID)
 }
 
+// GetResult retrieves the analysis result for a completed task.
+func (r *Repository) GetResult(ctx context.Context, taskID string) (model.TaskResult, error) {
+	row := r.db.QueryRowContext(ctx,
+		`SELECT result_json FROM tasks WHERE id = ?`, taskID,
+	)
+
+	var resultJSON string
+	err := row.Scan(&resultJSON)
+	if err == sql.ErrNoRows {
+		return model.TaskResult{}, model.ErrTaskNotFound
+	}
+	if err != nil {
+		return model.TaskResult{}, fmt.Errorf("scan result: %w", err)
+	}
+
+	if resultJSON == "" {
+		return model.TaskResult{}, model.ErrTaskNotCompleted
+	}
+
+	var result model.TaskResult
+	if err := json.Unmarshal([]byte(resultJSON), &result); err != nil {
+		return model.TaskResult{}, fmt.Errorf("unmarshal result: %w", err)
+	}
+
+	return result, nil
+}
+
 // Delete removes a task by ID.
 func (r *Repository) Delete(ctx context.Context, taskID string) error {
 	res, err := r.db.ExecContext(ctx, `DELETE FROM tasks WHERE id = ?`, taskID)

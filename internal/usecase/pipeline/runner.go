@@ -1,0 +1,206 @@
+package pipeline
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+	"sync"
+
+	"github.com/um4ru-ch4n/youtube-analyzer-mcp/internal/config"
+	"github.com/um4ru-ch4n/youtube-analyzer-mcp/internal/model"
+	"github.com/um4ru-ch4n/youtube-analyzer-mcp/pkg/logger"
+)
+
+// StatusUpdater persists task status changes during pipeline execution.
+type StatusUpdater interface {
+	UpdateStatus(ctx context.Context, taskID string, status model.TaskStatus, progress string) error
+	UpdateWarnings(ctx context.Context, taskID string, warnings []model.Warning) error
+}
+
+// Runner orchestrates the full video analysis pipeline.
+type Runner struct {
+	downloader      Downloader
+	transcriber     Transcriber
+	frameExtractor  FrameExtractor
+	frameClassifier FrameClassifier
+	ocrReader       OCRReader
+	visionAnalyzer  VisionAnalyzer
+	summarizer      Summarizer
+	deduplicator    Deduplicator
+	statusUpdater   StatusUpdater
+	cfg             config.PipelineConfig
+	dataDir         string
+}
+
+// New creates a new pipeline Runner.
+func New(
+	downloader Downloader,
+	transcriber Transcriber,
+	frameExtractor FrameExtractor,
+	frameClassifier FrameClassifier,
+	ocrReader OCRReader,
+	visionAnalyzer VisionAnalyzer,
+	summarizer Summarizer,
+	deduplicator Deduplicator,
+	statusUpdater StatusUpdater,
+	cfg config.PipelineConfig,
+	dataDir string,
+) *Runner {
+	return &Runner{
+		downloader:      downloader,
+		transcriber:     transcriber,
+		frameExtractor:  frameExtractor,
+		frameClassifier: frameClassifier,
+		ocrReader:       ocrReader,
+		visionAnalyzer:  visionAnalyzer,
+		summarizer:      summarizer,
+		deduplicator:    deduplicator,
+		statusUpdater:   statusUpdater,
+		cfg:             cfg,
+		dataDir:         dataDir,
+	}
+}
+
+// Run executes the full analysis pipeline for the given task
+// and returns a TaskResult. It satisfies the PipelineRunner interface.
+func (r *Runner) Run(ctx context.Context, task model.Task) (model.TaskResult, error) {
+	taskDir := filepath.Join(r.dataDir, "tasks", task.ID)
+	if err := os.MkdirAll(taskDir, 0o755); err != nil {
+		return model.TaskResult{}, fmt.Errorf("create task dir: %w", err)
+	}
+
+	state := &State{
+		TaskID:   task.ID,
+		VideoURL: task.VideoURL,
+		TempDir:  taskDir,
+	}
+
+	// Step 1: Download
+	if err := r.updateStatus(ctx, state, model.TaskStatusDownloading); err != nil {
+		return model.TaskResult{}, err
+	}
+
+	if err := r.download(ctx, state); err != nil {
+		return model.TaskResult{}, model.PipelineError{Step: "download", Cause: err}
+	}
+
+	// Step 2: Parallel fan-out — transcribe + extract frames
+	var (
+		transcribeErr    error
+		extractFramesErr error
+		parallelWg       sync.WaitGroup
+	)
+
+	parallelWg.Add(2)
+
+	go func() {
+		defer parallelWg.Done()
+		if err := r.updateStatus(ctx, state, model.TaskStatusTranscribing); err != nil {
+			transcribeErr = err
+			return
+		}
+		transcribeErr = r.transcribe(ctx, state)
+	}()
+
+	go func() {
+		defer parallelWg.Done()
+		if err := r.updateStatus(ctx, state, model.TaskStatusExtractingFrames); err != nil {
+			extractFramesErr = err
+			return
+		}
+		extractFramesErr = r.extractFrames(ctx, state)
+	}()
+
+	parallelWg.Wait()
+
+	if transcribeErr != nil {
+		return model.TaskResult{}, model.PipelineError{Step: "transcribe", Cause: transcribeErr}
+	}
+	if extractFramesErr != nil {
+		return model.TaskResult{}, model.PipelineError{Step: "extract_frames", Cause: extractFramesErr}
+	}
+
+	// Step 3: Process frames (classify + OCR/Vision)
+	if err := r.updateStatus(ctx, state, model.TaskStatusProcessingFrames); err != nil {
+		return model.TaskResult{}, err
+	}
+
+	if err := r.processFrames(ctx, state); err != nil {
+		return model.TaskResult{}, model.PipelineError{Step: "process_frames", Cause: err}
+	}
+
+	// Step 4: Chunk (merge transcript + frames by time)
+	if err := r.updateStatus(ctx, state, model.TaskStatusChunking); err != nil {
+		return model.TaskResult{}, err
+	}
+
+	if err := r.chunk(ctx, state); err != nil {
+		return model.TaskResult{}, model.PipelineError{Step: "chunk", Cause: err}
+	}
+
+	// Step 5: Summarize
+	if err := r.updateStatus(ctx, state, model.TaskStatusSummarizing); err != nil {
+		return model.TaskResult{}, err
+	}
+
+	if err := r.summarize(ctx, state); err != nil {
+		return model.TaskResult{}, model.PipelineError{Step: "summarize", Cause: err}
+	}
+
+	// Step 6: Build result
+	result := r.buildResult(state)
+
+	// Cleanup temp files (keep frames + result)
+	r.cleanup(ctx, state)
+
+	// Persist warnings if any
+	if len(state.Warnings) > 0 {
+		if err := r.statusUpdater.UpdateWarnings(ctx, state.TaskID, state.Warnings); err != nil {
+			logger.WarnKV(ctx, "failed to persist warnings", "error", err.Error())
+		}
+	}
+
+	return result, nil
+}
+
+func (r *Runner) updateStatus(ctx context.Context, state *State, status model.TaskStatus) error {
+	logger.InfoKV(ctx, "pipeline step", "task_id", state.TaskID, "status", string(status))
+	return r.statusUpdater.UpdateStatus(ctx, state.TaskID, status, string(status))
+}
+
+func (r *Runner) buildResult(state *State) model.TaskResult {
+	var sb strings.Builder
+	for i, seg := range state.Transcript.Segments {
+		if i > 0 {
+			sb.WriteString(" ")
+		}
+		sb.WriteString(seg.Text)
+	}
+
+	return model.TaskResult{
+		VideoMeta:       state.VideoMeta,
+		Chunks:          state.Summaries,
+		FullTranscript:  sb.String(),
+		TotalFrames:     len(state.Frames),
+		DurationSeconds: state.VideoMeta.DurationSeconds,
+	}
+}
+
+func (r *Runner) cleanup(ctx context.Context, state *State) {
+	// Remove video and audio files, keep frames directory and result
+	videoPath := state.DownloadResult.VideoPath
+	if videoPath != "" {
+		if err := os.Remove(videoPath); err != nil {
+			logger.DebugKV(ctx, "failed to remove video file", "path", videoPath, "error", err.Error())
+		}
+	}
+
+	audioPath := state.DownloadResult.AudioPath
+	if audioPath != "" {
+		if err := os.Remove(audioPath); err != nil {
+			logger.DebugKV(ctx, "failed to remove audio file", "path", audioPath, "error", err.Error())
+		}
+	}
+}
