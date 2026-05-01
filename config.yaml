@@ -1,0 +1,54 @@
+pipeline:
+  chunk_duration_sec: 45
+  overlap_sec: 10
+  max_video_duration_sec: 7200
+  max_concurrent_frames: 8
+  scene_detect_threshold: 0.3
+  scene_detect_min_frames: 5
+  scene_detect_max_frames: 500
+  fallback_interval_sec: 5
+  dedup_similarity_threshold: 0.95
+
+worker_pool:
+  size: 2
+  queue_size: 100
+
+storage:
+  data_dir: "./data"
+
+whisper:
+  url: "http://whisper:8001"
+  timeout_sec: 300
+  model: "large-v3-turbo"
+
+clip:
+  url: "http://clip:8002"
+  timeout_sec: 30
+
+vision:
+  provider: "gemini"
+  gemini:
+    model: "gemini-2.0-flash"
+    timeout_sec: 60
+  claude:
+    model: "claude-sonnet-4-20250514"
+    timeout_sec: 60
+
+summarizer:
+  provider: "ollama"
+  ollama:
+    url: "http://ollama:11434"
+    model: "qwen3:8b"
+    timeout_sec: 120
+
+ocr:
+  languages:
+    - "eng"
+    - "rus"
+
+http:
+  port: 3000
+  path: "/mcp"
+
+logging:
+  default_level: "info"
