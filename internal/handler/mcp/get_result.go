@@ -2,12 +2,8 @@ package mcp
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
-	"strings"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
@@ -21,15 +17,18 @@ type resultResponse struct {
 	VideoURL        string                `json:"video_url"`
 	VideoTitle      string                `json:"video_title"`
 	DurationSeconds float64               `json:"duration_seconds"`
+	TotalChunks     int                   `json:"total_chunks"`
+	TotalArtifacts  int                   `json:"total_artifacts"`
 	Chunks          []resultChunkResponse `json:"chunks"`
 }
 
 type resultChunkResponse struct {
-	Index     int                       `json:"index"`
-	TimeStart float64                   `json:"time_start"`
-	TimeEnd   float64                   `json:"time_end"`
-	Summary   string                    `json:"summary"`
-	Artifacts []resultArtifactResponse  `json:"artifacts,omitempty"`
+	Index          int                      `json:"index"`
+	TimeStart      float64                  `json:"time_start"`
+	TimeEnd        float64                  `json:"time_end"`
+	Summary        string                   `json:"summary"`
+	ArtifactCount  int                      `json:"artifact_count"`
+	Artifacts      []resultArtifactResponse `json:"artifacts,omitempty"`
 }
 
 type resultArtifactResponse struct {
@@ -43,11 +42,11 @@ func (h *Handler) registerGetResult(s *server.MCPServer) {
 	s.AddTool(
 		mcp.NewTool("get_result",
 			mcp.WithDescription(
-				"Get the full analysis result for a completed video task. "+
-					"Only works when task status is 'completed' (check with get_status first). "+
-					"Returns structured data: video metadata, time-based chunks with text summaries, "+
-					"and visual artifacts (images + optional OCR text from slides/code). "+
-					"Artifact images are returned as embedded base64 for direct viewing.",
+				"Get the text analysis result for a completed video task. "+
+					"Returns JSON with video metadata, time-based chunks with text summaries, "+
+					"and artifact metadata (timestamps, types, OCR text). "+
+					"Images are NOT included — use get_artifacts with a chunk index to fetch "+
+					"visual artifacts for specific chunks that need deeper analysis.",
 			),
 			mcp.WithString("task_id",
 				mcp.Required(),
@@ -72,62 +71,20 @@ func (h *Handler) handleGetResult(ctx context.Context, req mcp.CallToolRequest) 
 		return toErrorResult(err), nil
 	}
 
-	return buildMCPResult(taskID, result), nil
-}
-
-// buildMCPResult creates an MCP response with text JSON + embedded images for artifacts.
-func buildMCPResult(taskID string, result model.TaskResult) *mcp.CallToolResult {
 	resp := buildResultResponse(taskID, result)
 
 	formatted, err := json.MarshalIndent(resp, "", "  ")
 	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf("Error: failed to marshal response: %v", err))
+		return toErrorResult(fmt.Errorf("marshal response: %w", err)), nil
 	}
 
-	// Start with text content.
-	contents := []mcp.Content{
-		mcp.NewTextContent(string(formatted)),
-	}
-
-	// Attach artifact images as embedded base64.
-	for _, chunk := range result.Chunks {
-		for _, artifact := range chunk.Artifacts {
-			if artifact.ImagePath == "" {
-				continue
-			}
-
-			imgData, readErr := os.ReadFile(artifact.ImagePath)
-			if readErr != nil {
-				logger.Logger().Warnw("failed to read artifact image",
-					"path", artifact.ImagePath,
-					"error", readErr.Error(),
-				)
-				continue
-			}
-
-			mimeType := detectMimeType(artifact.ImagePath)
-			b64 := base64.StdEncoding.EncodeToString(imgData)
-
-			label := fmt.Sprintf("[%s artifact at %.1fs", artifact.Type, artifact.TimestampSec)
-			if artifact.OCRText != "" {
-				label += " — OCR text included in JSON"
-			}
-			label += "]"
-
-			contents = append(contents,
-				mcp.NewTextContent(label),
-				mcp.NewImageContent(b64, mimeType),
-			)
-		}
-	}
-
-	return &mcp.CallToolResult{
-		Content: contents,
-	}
+	return mcp.NewToolResultText(string(formatted)), nil
 }
 
 func buildResultResponse(taskID string, result model.TaskResult) resultResponse {
+	totalArtifacts := 0
 	chunks := make([]resultChunkResponse, 0, len(result.Chunks))
+
 	for _, c := range result.Chunks {
 		artifacts := make([]resultArtifactResponse, 0, len(c.Artifacts))
 		for _, a := range c.Artifacts {
@@ -139,12 +96,15 @@ func buildResultResponse(taskID string, result model.TaskResult) resultResponse 
 			})
 		}
 
+		totalArtifacts += len(artifacts)
+
 		chunks = append(chunks, resultChunkResponse{
-			Index:     c.Index,
-			TimeStart: c.TimeStart,
-			TimeEnd:   c.TimeEnd,
-			Summary:   c.Summary,
-			Artifacts: artifacts,
+			Index:         c.Index,
+			TimeStart:     c.TimeStart,
+			TimeEnd:       c.TimeEnd,
+			Summary:       c.Summary,
+			ArtifactCount: len(artifacts),
+			Artifacts:     artifacts,
 		})
 	}
 
@@ -153,14 +113,8 @@ func buildResultResponse(taskID string, result model.TaskResult) resultResponse 
 		VideoURL:        result.VideoMeta.URL,
 		VideoTitle:      result.VideoMeta.Title,
 		DurationSeconds: result.DurationSeconds,
+		TotalChunks:     len(chunks),
+		TotalArtifacts:  totalArtifacts,
 		Chunks:          chunks,
 	}
-}
-
-func detectMimeType(path string) string {
-	ext := strings.ToLower(filepath.Ext(path))
-	if ext == ".png" {
-		return "image/png"
-	}
-	return "image/jpeg"
 }

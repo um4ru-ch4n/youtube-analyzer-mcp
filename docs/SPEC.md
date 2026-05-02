@@ -443,3 +443,4 @@ volumes:
 - Public hosting
 - Research and compile list of domains/subdomains needed for split-tunnel VPN config (googlevideo.com, youtube.com, etc.) so yt-dlp works without routing all traffic through VPN
 - Increase frame extraction frequency to 1-2 sec (requires GPU for CLIP). Current 5 sec misses fast-changing slides/code. Strategy: extract at 1-2 sec → aggressive pHash dedup (threshold 0.90) → CLIP filters out talking_head → only informative frames reach OCR/Vision
+- Temporal content dedup for whiteboard videos: detect when frames show incremental additions to the same drawing/board and keep only the final (most complete) frame of each "board session". Drop intermediate buildup frames. Requires Vision API to understand content accumulation. Strategy: group consecutive diagram frames by visual similarity → ask Vision "does frame N contain all info from frame N-1?" → keep only the last frame in each group where answer is "yes"
