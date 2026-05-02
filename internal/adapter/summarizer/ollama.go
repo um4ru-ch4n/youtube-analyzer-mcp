@@ -37,8 +37,8 @@ type ollamaResponse struct {
 	Response string `json:"response"`
 }
 
-func (s *OllamaSummarizer) SummarizeChunk(ctx context.Context, transcriptText string) (string, error) {
-	prompt := buildPrompt(transcriptText)
+func (s *OllamaSummarizer) SummarizeChunk(ctx context.Context, videoTitle string, transcriptText string, compressionRatio int) (string, error) {
+	prompt := buildPrompt(videoTitle, transcriptText, compressionRatio)
 
 	reqBody := ollamaRequest{
 		Model:  s.model,
@@ -77,14 +77,27 @@ func (s *OllamaSummarizer) SummarizeChunk(ctx context.Context, transcriptText st
 	return strings.TrimSpace(result.Response), nil
 }
 
-func buildPrompt(transcriptText string) string {
+func buildPrompt(videoTitle string, transcriptText string, compressionRatio int) string {
+	wordCount := len(strings.Fields(transcriptText))
+	targetWords := wordCount / compressionRatio
+	if targetWords < 20 {
+		targetWords = 20
+	}
+
 	var sb strings.Builder
 
-	sb.WriteString("Summarize the following video segment transcript.\n\n")
-	sb.WriteString("## Transcript\n")
+	sb.WriteString(fmt.Sprintf("You are condensing a segment from the video \"%s\".\n", videoTitle))
+	sb.WriteString("Your task is to compress the transcript while preserving the speaker's voice, tone, and style.\n\n")
+	sb.WriteString("Rules:\n")
+	sb.WriteString("- Write as if YOU are the speaker — same tone, same style, same energy\n")
+	sb.WriteString("- This is NOT a third-person summary. Do NOT write 'The speaker discusses...' or 'The video explains...'\n")
+	sb.WriteString("- Keep specific numbers, names, prices, and technical terms exactly as stated\n")
+	sb.WriteString("- Preserve the logical flow — this should read like a shorter version of the same speech\n")
+	sb.WriteString("- Remove filler words, repetitions, and tangents, but keep the substance\n")
+	sb.WriteString(fmt.Sprintf("- Target length: approximately %d words (compress %dx from original)\n", targetWords, compressionRatio))
+	sb.WriteString("- Output ONLY the compressed text, no headers or explanations\n")
+	sb.WriteString("\n## Original transcript:\n")
 	sb.WriteString(transcriptText)
-	sb.WriteString("\n\n")
-	sb.WriteString("Provide a concise summary of the spoken content.")
 
 	return sb.String()
 }

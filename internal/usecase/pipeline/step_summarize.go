@@ -22,7 +22,12 @@ func (r *Runner) summarize(ctx context.Context, state *State) error {
 			sb.WriteString(" ")
 		}
 
-		summary, err := r.summarizer.SummarizeChunk(ctx, sb.String())
+		compressionRatio := r.cfg.SummaryCompressionRatio
+		if compressionRatio <= 0 {
+			compressionRatio = 5
+		}
+
+		summary, err := r.summarizer.SummarizeChunk(ctx, state.VideoMeta.Title, sb.String(), compressionRatio)
 		if err != nil {
 			logger.WarnKV(ctx, "chunk summarization failed, using empty summary",
 				"task_id", state.TaskID,

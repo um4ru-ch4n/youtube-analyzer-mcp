@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"sort"
 	"strconv"
+	"strings"
 
 	"go.uber.org/zap"
 
@@ -33,16 +34,25 @@ func New(cfg Config, logger *zap.Logger) *Extractor {
 }
 
 func (e *Extractor) ExtractFrames(ctx context.Context, videoPath, outputDir string) ([]model.Frame, error) {
+	// Get video duration to calculate dynamic min frames.
+	durationSec := e.getVideoDuration(ctx, videoPath)
+	minFrames := e.dynamicMinFrames(durationSec)
+
+	e.logger.Info("frame extraction starting",
+		zap.Float64("video_duration_sec", durationSec),
+		zap.Int("dynamic_min_frames", minFrames),
+	)
+
 	frames, err := e.extractWithSceneDetect(ctx, videoPath, outputDir)
 	if err != nil {
 		e.logger.Warn("scene detection failed, falling back to interval mode", zap.Error(err))
 		return e.extractWithInterval(ctx, videoPath, outputDir)
 	}
 
-	if len(frames) < e.cfg.MinFrames || len(frames) > e.cfg.MaxFrames {
+	if len(frames) < minFrames || len(frames) > e.cfg.MaxFrames {
 		e.logger.Info("scene detection frame count out of range, falling back to interval mode",
 			zap.Int("got", len(frames)),
-			zap.Int("min", e.cfg.MinFrames),
+			zap.Int("min", minFrames),
 			zap.Int("max", e.cfg.MaxFrames),
 		)
 		if err := e.cleanFrames(outputDir); err != nil {
@@ -52,6 +62,47 @@ func (e *Extractor) ExtractFrames(ctx context.Context, videoPath, outputDir stri
 	}
 
 	return frames, nil
+}
+
+// dynamicMinFrames calculates minimum expected frames based on video duration.
+// At least 1 frame per FallbackInterval seconds (same as interval mode would produce).
+func (e *Extractor) dynamicMinFrames(durationSec float64) int {
+	if durationSec <= 0 {
+		return e.cfg.MinFrames
+	}
+
+	// Expect at least 1 frame per interval, with a floor of config MinFrames.
+	expected := int(durationSec / float64(e.cfg.FallbackInterval))
+	if expected < e.cfg.MinFrames {
+		return e.cfg.MinFrames
+	}
+	return expected
+}
+
+// getVideoDuration uses ffprobe to get video duration in seconds.
+func (e *Extractor) getVideoDuration(ctx context.Context, videoPath string) float64 {
+	args := []string{
+		"-v", "error",
+		"-show_entries", "format=duration",
+		"-of", "default=noprint_wrappers=1:nokey=1",
+		videoPath,
+	}
+
+	cmd := exec.CommandContext(ctx, "ffprobe", args...)
+	var stdout bytes.Buffer
+	cmd.Stdout = &stdout
+
+	if err := cmd.Run(); err != nil {
+		e.logger.Warn("ffprobe failed, using 0 duration", zap.Error(err))
+		return 0
+	}
+
+	duration, err := strconv.ParseFloat(strings.TrimSpace(stdout.String()), 64)
+	if err != nil {
+		return 0
+	}
+
+	return duration
 }
 
 func (e *Extractor) extractWithSceneDetect(ctx context.Context, videoPath, outputDir string) ([]model.Frame, error) {

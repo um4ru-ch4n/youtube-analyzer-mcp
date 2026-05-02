@@ -33,7 +33,7 @@ type VisionAnalyzer interface {
 }
 
 type Summarizer interface {
-	SummarizeChunk(ctx context.Context, transcriptText string) (string, error)
+	SummarizeChunk(ctx context.Context, videoTitle string, transcriptText string, compressionRatio int) (string, error)
 }
 
 type Deduplicator interface {

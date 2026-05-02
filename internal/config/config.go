@@ -22,14 +22,15 @@ type Config struct {
 }
 
 type PipelineConfig struct {
-	ChunkDurationSec        int     `mapstructure:"chunk_duration_sec"`
-	OverlapSec              int     `mapstructure:"overlap_sec"`
-	MaxVideoDurationSec     int     `mapstructure:"max_video_duration_sec"`
-	MaxConcurrentFrames     int     `mapstructure:"max_concurrent_frames"`
-	SceneDetectThreshold    float64 `mapstructure:"scene_detect_threshold"`
-	SceneDetectMinFrames    int     `mapstructure:"scene_detect_min_frames"`
-	SceneDetectMaxFrames    int     `mapstructure:"scene_detect_max_frames"`
-	FallbackIntervalSec     int     `mapstructure:"fallback_interval_sec"`
+	ChunkDurationSec         int     `mapstructure:"chunk_duration_sec"`
+	OverlapSec               int     `mapstructure:"overlap_sec"`
+	SummaryCompressionRatio  int     `mapstructure:"summary_compression_ratio"`
+	MaxVideoDurationSec      int     `mapstructure:"max_video_duration_sec"`
+	MaxConcurrentFrames      int     `mapstructure:"max_concurrent_frames"`
+	SceneDetectThreshold     float64 `mapstructure:"scene_detect_threshold"`
+	SceneDetectMinFrames     int     `mapstructure:"scene_detect_min_frames"`
+	SceneDetectMaxFrames     int     `mapstructure:"scene_detect_max_frames"`
+	FallbackIntervalSec      int     `mapstructure:"fallback_interval_sec"`
 	DedupSimilarityThreshold float64 `mapstructure:"dedup_similarity_threshold"`
 }
 

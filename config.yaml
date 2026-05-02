@@ -1,5 +1,6 @@
 pipeline:
-  chunk_duration_sec: 45
+  chunk_duration_sec: 30
+  summary_compression_ratio: 5
   overlap_sec: 10
   max_video_duration_sec: 7200
   max_concurrent_frames: 8

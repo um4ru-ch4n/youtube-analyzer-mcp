@@ -140,7 +140,7 @@ func (r *Runner) Run(ctx context.Context, task model.Task) (model.TaskResult, er
 		state.LastStep = "02_transcribe_frames"
 		r.saveCheckpoint(ctx, state)
 		r.saveProcessingArtifact(ctx, state, "transcript", state.Transcript)
-		r.saveProcessingArtifact(ctx, state, "frames_extracted", state.Frames)
+		r.saveProcessingArtifact(ctx, state, "frames_deduped", state.Frames)
 	}
 
 	// Step 3: Process frames (classify + OCR/Vision)
@@ -155,7 +155,7 @@ func (r *Runner) Run(ctx context.Context, task model.Task) (model.TaskResult, er
 
 		state.LastStep = "03_process_frames"
 		r.saveCheckpoint(ctx, state)
-		r.saveProcessingArtifact(ctx, state, "frames_processed", state.ProcessedFrames)
+		r.saveProcessingArtifact(ctx, state, "frames_classified", state.ProcessedFrames)
 	}
 
 	// Step 4: Chunk (merge transcript + frames by time)
