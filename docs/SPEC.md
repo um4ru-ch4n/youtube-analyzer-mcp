@@ -442,3 +442,4 @@ volumes:
 - Custom summarization server (replace Ollama)
 - Public hosting
 - Research and compile list of domains/subdomains needed for split-tunnel VPN config (googlevideo.com, youtube.com, etc.) so yt-dlp works without routing all traffic through VPN
+- Increase frame extraction frequency to 1-2 sec (requires GPU for CLIP). Current 5 sec misses fast-changing slides/code. Strategy: extract at 1-2 sec → aggressive pHash dedup (threshold 0.90) → CLIP filters out talking_head → only informative frames reach OCR/Vision

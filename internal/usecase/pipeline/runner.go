@@ -65,88 +65,121 @@ func New(
 
 // Run executes the full analysis pipeline for the given task
 // and returns a TaskResult. It satisfies the PipelineRunner interface.
+// Supports resume from checkpoint — if a previous run saved state, it
+// skips already completed steps.
 func (r *Runner) Run(ctx context.Context, task model.Task) (model.TaskResult, error) {
 	taskDir := filepath.Join(r.dataDir, "tasks", task.ID)
 	if err := os.MkdirAll(taskDir, 0o755); err != nil {
 		return model.TaskResult{}, fmt.Errorf("create task dir: %w", err)
 	}
 
-	state := &State{
-		TaskID:   task.ID,
-		VideoURL: task.VideoURL,
-		TempDir:  taskDir,
+	// Try to resume from checkpoint.
+	state, err := LoadCheckpoint(taskDir)
+	if err != nil {
+		logger.WarnKV(ctx, "failed to load checkpoint, starting fresh", "error", err.Error())
 	}
 
-	// Step 1: Download
-	if err := r.updateStatus(ctx, state, model.TaskStatusDownloading); err != nil {
-		return model.TaskResult{}, err
+	if state != nil {
+		logger.InfoKV(ctx, "resuming from checkpoint", "task_id", task.ID, "last_step", state.LastStep)
 	}
 
-	if err := r.download(ctx, state); err != nil {
-		return model.TaskResult{}, model.PipelineError{Step: "download", Cause: err}
-	}
-
-	// Step 2: Parallel fan-out — transcribe + extract frames
-	var (
-		transcribeErr    error
-		extractFramesErr error
-		parallelWg       sync.WaitGroup
-	)
-
-	parallelWg.Add(2)
-
-	go func() {
-		defer parallelWg.Done()
-		if err := r.updateStatus(ctx, state, model.TaskStatusTranscribing); err != nil {
-			transcribeErr = err
-			return
+	if state == nil {
+		state = &State{
+			TaskID:   task.ID,
+			VideoURL: task.VideoURL,
+			TempDir:  taskDir,
 		}
-		transcribeErr = r.transcribe(ctx, state)
-	}()
-
-	go func() {
-		defer parallelWg.Done()
-		if err := r.updateStatus(ctx, state, model.TaskStatusExtractingFrames); err != nil {
-			extractFramesErr = err
-			return
-		}
-		extractFramesErr = r.extractFrames(ctx, state)
-	}()
-
-	parallelWg.Wait()
-
-	if transcribeErr != nil {
-		return model.TaskResult{}, model.PipelineError{Step: "transcribe", Cause: transcribeErr}
 	}
-	if extractFramesErr != nil {
-		return model.TaskResult{}, model.PipelineError{Step: "extract_frames", Cause: extractFramesErr}
+
+	// Step 1: Download (skip if already done)
+	if state.LastStep < "01_download" {
+		if err := r.updateStatus(ctx, state, model.TaskStatusDownloading); err != nil {
+			return model.TaskResult{}, err
+		}
+
+		if err := r.download(ctx, state); err != nil {
+			return model.TaskResult{}, model.PipelineError{Step: "download", Cause: err}
+		}
+
+		state.LastStep = "01_download"
+		r.saveCheckpoint(ctx, state)
+	}
+
+	// Step 2: Parallel fan-out — transcribe + extract frames (skip if already done)
+	if state.LastStep < "02_transcribe_frames" {
+		var (
+			transcribeErr    error
+			extractFramesErr error
+			parallelWg       sync.WaitGroup
+		)
+
+		parallelWg.Add(2)
+
+		go func() {
+			defer parallelWg.Done()
+			r.updateStatus(ctx, state, model.TaskStatusTranscribing)
+			transcribeErr = r.transcribe(ctx, state)
+		}()
+
+		go func() {
+			defer parallelWg.Done()
+			r.updateStatus(ctx, state, model.TaskStatusExtractingFrames)
+			extractFramesErr = r.extractFrames(ctx, state)
+		}()
+
+		parallelWg.Wait()
+
+		if transcribeErr != nil {
+			return model.TaskResult{}, model.PipelineError{Step: "transcribe", Cause: transcribeErr}
+		}
+		if extractFramesErr != nil {
+			return model.TaskResult{}, model.PipelineError{Step: "extract_frames", Cause: extractFramesErr}
+		}
+
+		state.LastStep = "02_transcribe_frames"
+		r.saveCheckpoint(ctx, state)
 	}
 
 	// Step 3: Process frames (classify + OCR/Vision)
-	if err := r.updateStatus(ctx, state, model.TaskStatusProcessingFrames); err != nil {
-		return model.TaskResult{}, err
-	}
+	if state.LastStep < "03_process_frames" {
+		if err := r.updateStatus(ctx, state, model.TaskStatusProcessingFrames); err != nil {
+			return model.TaskResult{}, err
+		}
 
-	if err := r.processFrames(ctx, state); err != nil {
-		return model.TaskResult{}, model.PipelineError{Step: "process_frames", Cause: err}
+		if err := r.processFrames(ctx, state); err != nil {
+			return model.TaskResult{}, model.PipelineError{Step: "process_frames", Cause: err}
+		}
+
+		state.LastStep = "03_process_frames"
+		r.saveCheckpoint(ctx, state)
 	}
 
 	// Step 4: Chunk (merge transcript + frames by time)
-	if err := r.updateStatus(ctx, state, model.TaskStatusChunking); err != nil {
-		return model.TaskResult{}, err
-	}
+	if state.LastStep < "04_chunk" {
+		if err := r.updateStatus(ctx, state, model.TaskStatusChunking); err != nil {
+			return model.TaskResult{}, err
+		}
 
-	if err := r.chunk(ctx, state); err != nil {
-		return model.TaskResult{}, model.PipelineError{Step: "chunk", Cause: err}
+		if err := r.chunk(ctx, state); err != nil {
+			return model.TaskResult{}, model.PipelineError{Step: "chunk", Cause: err}
+		}
+
+		state.LastStep = "04_chunk"
+		r.saveCheckpoint(ctx, state)
 	}
 
 	// Step 5: Summarize
-	if err := r.updateStatus(ctx, state, model.TaskStatusSummarizing); err != nil {
-		return model.TaskResult{}, err
-	}
+	if state.LastStep < "05_summarize" {
+		if err := r.updateStatus(ctx, state, model.TaskStatusSummarizing); err != nil {
+			return model.TaskResult{}, err
+		}
 
-	if err := r.summarize(ctx, state); err != nil {
-		return model.TaskResult{}, model.PipelineError{Step: "summarize", Cause: err}
+		if err := r.summarize(ctx, state); err != nil {
+			return model.TaskResult{}, model.PipelineError{Step: "summarize", Cause: err}
+		}
+
+		state.LastStep = "05_summarize"
+		r.saveCheckpoint(ctx, state)
 	}
 
 	// Step 6: Build result
@@ -163,6 +196,12 @@ func (r *Runner) Run(ctx context.Context, task model.Task) (model.TaskResult, er
 	}
 
 	return result, nil
+}
+
+func (r *Runner) saveCheckpoint(ctx context.Context, state *State) {
+	if err := state.Save(); err != nil {
+		logger.WarnKV(ctx, "failed to save checkpoint", "task_id", state.TaskID, "error", err.Error())
+	}
 }
 
 func (r *Runner) updateStatus(ctx context.Context, state *State, status model.TaskStatus) error {

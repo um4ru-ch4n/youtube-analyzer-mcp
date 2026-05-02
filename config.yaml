@@ -37,9 +37,9 @@ vision:
 summarizer:
   provider: "ollama"
   ollama:
-    url: "http://ollama:11434"
+    url: "http://host.docker.internal:11434"
     model: "qwen3:8b"
-    timeout_sec: 120
+    timeout_sec: 300
 
 ocr:
   languages:

@@ -125,3 +125,29 @@ func (m *Manager) Delete(ctx context.Context, taskID string) error {
 
 	return nil
 }
+
+// Retry re-enqueues a failed task for processing. The pipeline will resume
+// from the last checkpoint, skipping already completed steps.
+func (m *Manager) Retry(ctx context.Context, taskID string) error {
+	task, err := m.repo.Get(ctx, taskID)
+	if err != nil {
+		return err
+	}
+
+	if task.Status != model.TaskStatusFailed {
+		return fmt.Errorf("can only retry failed tasks, current status: %s", task.Status)
+	}
+
+	if err := m.repo.UpdateStatus(ctx, taskID, model.TaskStatusQueued, "queued"); err != nil {
+		return fmt.Errorf("reset task status: %w", err)
+	}
+
+	select {
+	case m.queue <- taskID:
+		logger.InfoKV(ctx, "task re-enqueued for retry", "task_id", taskID)
+	case <-ctx.Done():
+		return fmt.Errorf("enqueue retry: %w", ctx.Err())
+	}
+
+	return nil
+}

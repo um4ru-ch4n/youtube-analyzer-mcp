@@ -3,14 +3,21 @@ package pipeline
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 
 	"github.com/um4ru-ch4n/youtube-analyzer-mcp/pkg/logger"
 )
 
 func (r *Runner) extractFrames(ctx context.Context, state *State) error {
+	framesDir := filepath.Join(state.TempDir, "frames")
+	if err := os.MkdirAll(framesDir, 0o755); err != nil {
+		return fmt.Errorf("create frames dir: %w", err)
+	}
+
 	logger.InfoKV(ctx, "extracting frames", "task_id", state.TaskID, "video_path", state.DownloadResult.VideoPath)
 
-	frames, err := r.frameExtractor.ExtractFrames(ctx, state.DownloadResult.VideoPath, state.TempDir)
+	frames, err := r.frameExtractor.ExtractFrames(ctx, state.DownloadResult.VideoPath, framesDir)
 	if err != nil {
 		return fmt.Errorf("extract frames: %w", err)
 	}

@@ -12,4 +12,5 @@ type TaskService interface {
 	GetStatus(ctx context.Context, taskID string) (model.Task, error)
 	GetResult(ctx context.Context, taskID string) (model.TaskResult, error)
 	Delete(ctx context.Context, taskID string) error
+	Retry(ctx context.Context, taskID string) error
 }

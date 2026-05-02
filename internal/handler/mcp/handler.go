@@ -23,4 +23,5 @@ func (h *Handler) RegisterTools(s *server.MCPServer) {
 	h.registerGetStatus(s)
 	h.registerGetResult(s)
 	h.registerDeleteTask(s)
+	h.registerRetryTask(s)
 }
