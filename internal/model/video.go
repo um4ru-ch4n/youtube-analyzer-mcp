@@ -9,7 +9,8 @@ type VideoMeta struct {
 
 // DownloadResult holds the output paths and metadata from the download step.
 type DownloadResult struct {
-	VideoPath string    `json:"video_path"`
-	AudioPath string    `json:"audio_path"`
-	Meta      VideoMeta `json:"meta"`
+	VideoPath     string    `json:"video_path"`
+	AudioPath     string    `json:"audio_path"`
+	SubtitlesPath string    `json:"subtitles_path,omitempty"`
+	Meta          VideoMeta `json:"meta"`
 }

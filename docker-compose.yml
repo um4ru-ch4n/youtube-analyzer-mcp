@@ -4,18 +4,15 @@ services:
     volumes:
       - shared-data:/data
     environment:
-      - TRANSPORT_MODE=${TRANSPORT_MODE:-http}
-      - HTTP_PORT=${HTTP_PORT:-3000}
-      - LOG_LEVEL=${LOG_LEVEL:-info}
-      - APP_ENV=${APP_ENV:-production}
+      - TRANSPORT_MODE=http
+      - HTTP_PORT=39280
+      - LOG_LEVEL=debug
+      - APP_ENV=development
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
     ports:
-      - "${HTTP_PORT:-3000}:3000"
-    depends_on:
-      - whisper
-      - clip
-      - ollama
+      - "39280:39280"
+    # depends_on removed — start immediately, sidecars connect when ready
 
   whisper:
     build: ./sidecar/whisper

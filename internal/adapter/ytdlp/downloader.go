@@ -5,8 +5,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"go.uber.org/zap"
 
@@ -32,6 +34,7 @@ func (d *Downloader) Download(ctx context.Context, url, outputDir string) (model
 
 	videoArgs := []string{
 		"-f", "bestvideo[height<=1080]+bestaudio/best",
+		"--merge-output-format", "mp4",
 		"-o", videoPath,
 		url,
 	}
@@ -53,15 +56,57 @@ func (d *Downloader) Download(ctx context.Context, url, outputDir string) (model
 		return model.DownloadResult{}, fmt.Errorf("fetch metadata: %w", err)
 	}
 
+	// Try to download subtitles (auto-subs or manual) — fast, saves Whisper time.
+	subsPath := d.downloadSubtitles(ctx, url, outputDir)
+
 	return model.DownloadResult{
-		VideoPath: videoPath,
-		AudioPath: audioPath,
+		VideoPath:     videoPath,
+		AudioPath:     audioPath,
+		SubtitlesPath: subsPath,
 		Meta: model.VideoMeta{
 			Title:           meta.Title,
 			DurationSeconds: meta.Duration,
 			URL:             url,
 		},
 	}, nil
+}
+
+// downloadSubtitles tries to download subtitles via yt-dlp.
+// Returns path to VTT file if successful, empty string otherwise.
+func (d *Downloader) downloadSubtitles(ctx context.Context, url, outputDir string) string {
+	subsBase := filepath.Join(outputDir, "subs")
+
+	args := []string{
+		"--write-subs",
+		"--write-auto-subs",
+		"--sub-lang", "en,ru",
+		"--sub-format", "vtt",
+		"--skip-download",
+		"-o", subsBase,
+		url,
+	}
+
+	d.logger.Info("attempting subtitle download", zap.Strings("args", args))
+
+	// Ignore exit code — yt-dlp may fail on some languages but still download others.
+	_ = d.runCmd(ctx, "yt-dlp", args)
+
+	// Check if any VTT files were created regardless of exit code.
+	entries, err := os.ReadDir(outputDir)
+	if err != nil {
+		return ""
+	}
+
+	for _, e := range entries {
+		if strings.HasPrefix(e.Name(), "subs.") && strings.HasSuffix(e.Name(), ".vtt") {
+			vttPath := filepath.Join(outputDir, e.Name())
+			d.logger.Info("subtitles downloaded", zap.String("path", vttPath))
+			return vttPath
+		}
+	}
+
+	d.logger.Info("no subtitle files found after download")
+	return ""
 }
 
 func (d *Downloader) fetchMeta(ctx context.Context, url string) (ytdlpMeta, error) {

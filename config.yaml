@@ -14,7 +14,7 @@ worker_pool:
   queue_size: 100
 
 storage:
-  data_dir: "./data"
+  data_dir: "/data"
 
 whisper:
   url: "http://whisper:8001"
@@ -47,7 +47,7 @@ ocr:
     - "rus"
 
 http:
-  port: 3000
+  port: 39280
   path: "/mcp"
 
 logging:

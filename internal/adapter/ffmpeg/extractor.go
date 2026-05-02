@@ -59,6 +59,7 @@ func (e *Extractor) extractWithSceneDetect(ctx context.Context, videoPath, outpu
 	filter := fmt.Sprintf("select='gt(scene,%f)',showinfo", e.cfg.SceneThreshold)
 
 	args := []string{
+		"-y",
 		"-i", videoPath,
 		"-vf", filter,
 		"-vsync", "vfr",
@@ -72,6 +73,7 @@ func (e *Extractor) extractWithSceneDetect(ctx context.Context, videoPath, outpu
 	cmd.Stderr = &stderr
 
 	if err := cmd.Run(); err != nil {
+		e.logger.Debug("ffmpeg scene detect stderr", zap.String("stderr", stderr.String()))
 		return nil, fmt.Errorf("ffmpeg scene detect: %w", err)
 	}
 
@@ -83,6 +85,7 @@ func (e *Extractor) extractWithInterval(ctx context.Context, videoPath, outputDi
 	filter := fmt.Sprintf("fps=1/%d", e.cfg.FallbackInterval)
 
 	args := []string{
+		"-y",
 		"-i", videoPath,
 		"-vf", filter,
 		pattern,
@@ -95,6 +98,7 @@ func (e *Extractor) extractWithInterval(ctx context.Context, videoPath, outputDi
 	cmd.Stderr = &stderr
 
 	if err := cmd.Run(); err != nil {
+		e.logger.Error("ffmpeg interval extraction failed", zap.String("stderr", stderr.String()))
 		return nil, fmt.Errorf("ffmpeg interval extract: %w", err)
 	}
 

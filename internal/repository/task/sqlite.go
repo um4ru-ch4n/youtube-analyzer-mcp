@@ -35,6 +35,15 @@ func New(dbPath string) (*Repository, error) {
 		return nil, fmt.Errorf("set WAL mode: %w", err)
 	}
 
+	// Set busy timeout to avoid SQLITE_BUSY on concurrent writes.
+	if _, err := db.Exec("PRAGMA busy_timeout=5000"); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("set busy_timeout: %w", err)
+	}
+
+	// Limit to 1 connection — SQLite handles one writer at a time.
+	db.SetMaxOpenConns(1)
+
 	if err := Migrate(db); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("migrate: %w", err)

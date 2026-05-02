@@ -441,3 +441,4 @@ volumes:
 - PostgreSQL instead of SQLite
 - Custom summarization server (replace Ollama)
 - Public hosting
+- Research and compile list of domains/subdomains needed for split-tunnel VPN config (googlevideo.com, youtube.com, etc.) so yt-dlp works without routing all traffic through VPN
