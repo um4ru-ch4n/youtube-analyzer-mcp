@@ -3,8 +3,8 @@ package chunking
 import "github.com/um4ru-ch4n/youtube-analyzer-mcp/internal/model"
 
 // BuildChunks groups transcript segments into time-based chunks of approximately
-// chunkDurationSec seconds each, and assigns frame contents to chunks by timestamp.
-func BuildChunks(segments []model.TranscriptSegment, frames []model.FrameContent, chunkDurationSec int) []model.Chunk {
+// chunkDurationSec seconds each.
+func BuildChunks(segments []model.TranscriptSegment, chunkDurationSec int) []model.Chunk {
 	if len(segments) == 0 {
 		return nil
 	}
@@ -13,10 +13,7 @@ func BuildChunks(segments []model.TranscriptSegment, frames []model.FrameContent
 		chunkDurationSec = 45
 	}
 
-	chunks := buildSegmentChunks(segments, chunkDurationSec)
-	chunks = assignFramesToChunks(chunks, frames)
-
-	return chunks
+	return buildSegmentChunks(segments, chunkDurationSec)
 }
 
 func buildSegmentChunks(segments []model.TranscriptSegment, chunkDurationSec int) []model.Chunk {
@@ -60,26 +57,6 @@ func buildSegmentChunks(segments []model.TranscriptSegment, chunkDurationSec int
 			TimeEnd:   lastEnd,
 			Segments:  chunkSegments,
 		})
-	}
-
-	return chunks
-}
-
-func assignFramesToChunks(chunks []model.Chunk, frames []model.FrameContent) []model.Chunk {
-	if len(frames) == 0 {
-		return chunks
-	}
-
-	for i := range chunks {
-		for _, fc := range frames {
-			if fc.TimestampSec < chunks[i].TimeStart {
-				continue
-			}
-			if fc.TimestampSec > chunks[i].TimeEnd {
-				continue
-			}
-			chunks[i].Frames = append(chunks[i].Frames, fc)
-		}
 	}
 
 	return chunks

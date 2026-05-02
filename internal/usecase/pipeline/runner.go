@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -138,6 +139,8 @@ func (r *Runner) Run(ctx context.Context, task model.Task) (model.TaskResult, er
 
 		state.LastStep = "02_transcribe_frames"
 		r.saveCheckpoint(ctx, state)
+		r.saveProcessingArtifact(ctx, state, "transcript", state.Transcript)
+		r.saveProcessingArtifact(ctx, state, "frames_extracted", state.Frames)
 	}
 
 	// Step 3: Process frames (classify + OCR/Vision)
@@ -152,6 +155,7 @@ func (r *Runner) Run(ctx context.Context, task model.Task) (model.TaskResult, er
 
 		state.LastStep = "03_process_frames"
 		r.saveCheckpoint(ctx, state)
+		r.saveProcessingArtifact(ctx, state, "frames_processed", state.ProcessedFrames)
 	}
 
 	// Step 4: Chunk (merge transcript + frames by time)
@@ -166,6 +170,7 @@ func (r *Runner) Run(ctx context.Context, task model.Task) (model.TaskResult, er
 
 		state.LastStep = "04_chunk"
 		r.saveCheckpoint(ctx, state)
+		r.saveProcessingArtifact(ctx, state, "chunks", state.Chunks)
 	}
 
 	// Step 5: Summarize
@@ -182,8 +187,11 @@ func (r *Runner) Run(ctx context.Context, task model.Task) (model.TaskResult, er
 		r.saveCheckpoint(ctx, state)
 	}
 
+	r.saveProcessingArtifact(ctx, state, "summaries", state.Summaries)
+
 	// Step 6: Build result
 	result := r.buildResult(state)
+	r.saveProcessingArtifact(ctx, state, "result", result)
 
 	// Cleanup temp files (keep frames + result)
 	r.cleanup(ctx, state)
@@ -201,6 +209,26 @@ func (r *Runner) Run(ctx context.Context, task model.Task) (model.TaskResult, er
 func (r *Runner) saveCheckpoint(ctx context.Context, state *State) {
 	if err := state.Save(); err != nil {
 		logger.WarnKV(ctx, "failed to save checkpoint", "task_id", state.TaskID, "error", err.Error())
+	}
+}
+
+// saveProcessingArtifact saves a named intermediate result as JSON to processing/ dir.
+func (r *Runner) saveProcessingArtifact(ctx context.Context, state *State, name string, data any) {
+	dir := filepath.Join(state.TempDir, "processing")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		logger.WarnKV(ctx, "failed to create processing dir", "error", err.Error())
+		return
+	}
+
+	raw, err := json.MarshalIndent(data, "", "  ")
+	if err != nil {
+		logger.WarnKV(ctx, "failed to marshal artifact", "name", name, "error", err.Error())
+		return
+	}
+
+	path := filepath.Join(dir, name+".json")
+	if err := os.WriteFile(path, raw, 0o644); err != nil {
+		logger.WarnKV(ctx, "failed to write artifact", "name", name, "error", err.Error())
 	}
 }
 

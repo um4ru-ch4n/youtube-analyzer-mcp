@@ -11,18 +11,18 @@ import (
 
 // State carries data between pipeline steps.
 type State struct {
-	TaskID         string               `json:"task_id"`
-	VideoURL       string               `json:"video_url"`
-	VideoMeta      model.VideoMeta      `json:"video_meta"`
-	DownloadResult model.DownloadResult  `json:"download_result"`
-	Transcript     model.Transcript     `json:"transcript"`
-	Frames         []model.Frame        `json:"frames"`
-	FrameContents  []model.FrameContent `json:"frame_contents"`
-	Chunks         []model.Chunk        `json:"chunks"`
-	Summaries      []model.ChunkSummary `json:"summaries"`
-	Warnings       []model.Warning      `json:"warnings"`
-	TempDir        string               `json:"temp_dir"`
-	LastStep       string               `json:"last_step"`
+	TaskID          string                `json:"task_id"`
+	VideoURL        string                `json:"video_url"`
+	VideoMeta       model.VideoMeta       `json:"video_meta"`
+	DownloadResult  model.DownloadResult  `json:"download_result"`
+	Transcript      model.Transcript      `json:"transcript"`
+	Frames          []model.Frame         `json:"frames"`
+	ProcessedFrames []model.ProcessedFrame `json:"processed_frames"`
+	Chunks          []model.Chunk         `json:"chunks"`
+	Summaries       []model.ChunkSummary  `json:"summaries"`
+	Warnings        []model.Warning       `json:"warnings"`
+	TempDir         string                `json:"temp_dir"`
+	LastStep        string                `json:"last_step"`
 }
 
 // Save persists the state checkpoint to disk.

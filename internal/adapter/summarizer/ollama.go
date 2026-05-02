@@ -9,8 +9,6 @@ import (
 	"net/http"
 	"strings"
 	"time"
-
-	"github.com/um4ru-ch4n/youtube-analyzer-mcp/internal/model"
 )
 
 type OllamaSummarizer struct {
@@ -39,8 +37,8 @@ type ollamaResponse struct {
 	Response string `json:"response"`
 }
 
-func (s *OllamaSummarizer) SummarizeChunk(ctx context.Context, transcriptText string, frameContents []model.FrameContent) (string, error) {
-	prompt := buildPrompt(transcriptText, frameContents)
+func (s *OllamaSummarizer) SummarizeChunk(ctx context.Context, transcriptText string) (string, error) {
+	prompt := buildPrompt(transcriptText)
 
 	reqBody := ollamaRequest{
 		Model:  s.model,
@@ -79,23 +77,14 @@ func (s *OllamaSummarizer) SummarizeChunk(ctx context.Context, transcriptText st
 	return strings.TrimSpace(result.Response), nil
 }
 
-func buildPrompt(transcriptText string, frameContents []model.FrameContent) string {
+func buildPrompt(transcriptText string) string {
 	var sb strings.Builder
 
-	sb.WriteString("Summarize the following video segment.\n\n")
+	sb.WriteString("Summarize the following video segment transcript.\n\n")
 	sb.WriteString("## Transcript\n")
 	sb.WriteString(transcriptText)
 	sb.WriteString("\n\n")
-
-	if len(frameContents) > 0 {
-		sb.WriteString("## Visual Content\n")
-		for _, fc := range frameContents {
-			sb.WriteString(fmt.Sprintf("- [%.1fs] (%s): %s\n", fc.TimestampSec, fc.Type, fc.Content))
-		}
-		sb.WriteString("\n")
-	}
-
-	sb.WriteString("Provide a concise summary covering both the spoken content and visual elements.")
+	sb.WriteString("Provide a concise summary of the spoken content.")
 
 	return sb.String()
 }

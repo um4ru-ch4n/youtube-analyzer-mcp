@@ -29,10 +29,11 @@ type OCRReader interface {
 
 type VisionAnalyzer interface {
 	AnalyzeImage(ctx context.Context, imagePath, prompt string) (string, error)
+	IsUsefulFrame(ctx context.Context, imagePath string) (bool, error)
 }
 
 type Summarizer interface {
-	SummarizeChunk(ctx context.Context, transcriptText string, frameContents []model.FrameContent) (string, error)
+	SummarizeChunk(ctx context.Context, transcriptText string) (string, error)
 }
 
 type Deduplicator interface {

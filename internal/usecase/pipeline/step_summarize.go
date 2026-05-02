@@ -22,7 +22,7 @@ func (r *Runner) summarize(ctx context.Context, state *State) error {
 			sb.WriteString(" ")
 		}
 
-		summary, err := r.summarizer.SummarizeChunk(ctx, sb.String(), ch.Frames)
+		summary, err := r.summarizer.SummarizeChunk(ctx, sb.String())
 		if err != nil {
 			logger.WarnKV(ctx, "chunk summarization failed, using empty summary",
 				"task_id", state.TaskID,
@@ -39,12 +39,14 @@ func (r *Runner) summarize(ctx context.Context, state *State) error {
 			summary = ""
 		}
 
+		artifacts := matchArtifacts(state.ProcessedFrames, ch.TimeStart, ch.TimeEnd)
+
 		summaries = append(summaries, model.ChunkSummary{
 			Index:     ch.Index,
 			TimeStart: ch.TimeStart,
 			TimeEnd:   ch.TimeEnd,
 			Summary:   summary,
-			Frames:    ch.Frames,
+			Artifacts: artifacts,
 		})
 	}
 
@@ -53,4 +55,30 @@ func (r *Runner) summarize(ctx context.Context, state *State) error {
 	logger.InfoKV(ctx, "summarization complete", "task_id", state.TaskID, "summaries", len(summaries))
 
 	return nil
+}
+
+// matchArtifacts finds ProcessedFrames (Useful=true) that fall within the chunk time range.
+func matchArtifacts(frames []model.ProcessedFrame, timeStart, timeEnd float64) []model.Artifact {
+	var artifacts []model.Artifact
+
+	for _, pf := range frames {
+		if !pf.Useful {
+			continue
+		}
+		if pf.TimestampSec < timeStart {
+			continue
+		}
+		if pf.TimestampSec > timeEnd {
+			continue
+		}
+
+		artifacts = append(artifacts, model.Artifact{
+			TimestampSec: pf.TimestampSec,
+			Type:         pf.Type,
+			ImagePath:    pf.ImagePath,
+			OCRText:      pf.OCRText,
+		})
+	}
+
+	return artifacts
 }

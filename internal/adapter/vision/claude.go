@@ -132,3 +132,15 @@ func (c *ClaudeAnalyzer) AnalyzeImage(ctx context.Context, imagePath, prompt str
 
 	return strings.Join(textParts, "\n"), nil
 }
+
+func (c *ClaudeAnalyzer) IsUsefulFrame(ctx context.Context, imagePath string) (bool, error) {
+	prompt := "Is this video frame visually useful? It is useful if it contains a slide, code, diagram, chart, schema, or any informational visual content. It is NOT useful if it only shows a person talking (talking head) or is blank/blurry. Answer with exactly one word: yes or no."
+
+	response, err := c.AnalyzeImage(ctx, imagePath, prompt)
+	if err != nil {
+		return false, fmt.Errorf("vision usefulness check: %w", err)
+	}
+
+	lower := strings.ToLower(strings.TrimSpace(response))
+	return strings.HasPrefix(lower, "yes"), nil
+}

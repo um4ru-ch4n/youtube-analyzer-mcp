@@ -11,7 +11,7 @@ const (
 	FrameTypeOther       FrameType = "other"
 )
 
-// Frame represents an extracted video frame with its classification.
+// Frame represents an extracted video frame before classification.
 type Frame struct {
 	TimestampSec float64   `json:"timestamp_sec"`
 	FilePath     string    `json:"file_path"`
@@ -24,9 +24,12 @@ type FrameClassification struct {
 	Confidence float64   `json:"confidence"`
 }
 
-// FrameContent holds the textual content extracted from a processed frame.
-type FrameContent struct {
+// ProcessedFrame is a frame after CLIP classification + optional OCR.
+// It carries enough info to become an Artifact in the final result.
+type ProcessedFrame struct {
 	TimestampSec float64   `json:"timestamp_sec"`
 	Type         FrameType `json:"frame_type"`
-	Content      string    `json:"content"`
+	ImagePath    string    `json:"image_path"`
+	OCRText      string    `json:"ocr_text,omitempty"`
+	Useful       bool      `json:"useful"`
 }

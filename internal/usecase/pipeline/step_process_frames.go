@@ -24,7 +24,7 @@ func (r *Runner) processFrames(ctx context.Context, state *State) error {
 
 	sem := make(chan struct{}, maxConcurrent)
 	var mu sync.Mutex
-	contents := make([]model.FrameContent, 0, len(state.Frames))
+	processed := make([]model.ProcessedFrame, 0, len(state.Frames))
 
 	var wg sync.WaitGroup
 
@@ -37,9 +37,9 @@ func (r *Runner) processFrames(ctx context.Context, state *State) error {
 			sem <- struct{}{}
 			defer func() { <-sem }()
 
-			content, err := r.processOneFrame(ctx, f)
+			pf, err := r.processOneFrame(ctx, f)
 			if err != nil {
-				logger.WarnKV(ctx, "frame processing failed, skipping",
+				logger.WarnKV(ctx, "frame processing failed, assuming useful",
 					"task_id", state.TaskID,
 					"frame_index", idx,
 					"frame_path", f.FilePath,
@@ -53,64 +53,92 @@ func (r *Runner) processFrames(ctx context.Context, state *State) error {
 					Message:   fmt.Sprintf("frame at %.1fs (%s): %v", f.TimestampSec, f.FilePath, err),
 					Timestamp: time.Now().UTC(),
 				})
+				// On error, assume useful so Claude can decide later.
+				processed = append(processed, model.ProcessedFrame{
+					TimestampSec: f.TimestampSec,
+					Type:         model.FrameTypeOther,
+					ImagePath:    f.FilePath,
+					Useful:       true,
+				})
 				mu.Unlock()
 
 				return
 			}
 
 			mu.Lock()
-			contents = append(contents, content)
+			processed = append(processed, pf)
 			mu.Unlock()
 		}(i, frame)
 	}
 
 	wg.Wait()
 
-	state.FrameContents = contents
+	state.ProcessedFrames = processed
+
+	usefulCount := 0
+	for _, pf := range processed {
+		if pf.Useful {
+			usefulCount++
+		}
+	}
 
 	logger.InfoKV(ctx, "frame processing complete",
 		"task_id", state.TaskID,
-		"processed", len(contents),
-		"skipped", len(state.Frames)-len(contents),
+		"total", len(processed),
+		"useful", usefulCount,
 	)
 
 	return nil
 }
 
-func (r *Runner) processOneFrame(ctx context.Context, frame model.Frame) (model.FrameContent, error) {
+func (r *Runner) processOneFrame(ctx context.Context, frame model.Frame) (model.ProcessedFrame, error) {
 	classification, err := r.frameClassifier.Classify(ctx, frame.FilePath)
 	if err != nil {
-		return model.FrameContent{}, fmt.Errorf("classify frame: %w", err)
+		return model.ProcessedFrame{}, fmt.Errorf("classify frame: %w", err)
 	}
 
 	frameType := classification.Type
 
-	var content string
-
+	// talking_head -> not useful, skip
 	if frameType == model.FrameTypeTalkingHead {
-		content = "Talking head, no visual information"
+		return model.ProcessedFrame{
+			TimestampSec: frame.TimestampSec,
+			Type:         frameType,
+			ImagePath:    frame.FilePath,
+			Useful:       false,
+		}, nil
 	}
 
+	// slide/code -> run OCR, mark useful
 	if frameType == model.FrameTypeSlide || frameType == model.FrameTypeCode {
 		text, ocrErr := r.ocrReader.ReadText(ctx, frame.FilePath)
 		if ocrErr != nil {
-			return model.FrameContent{}, fmt.Errorf("OCR failed: %w", ocrErr)
+			return model.ProcessedFrame{}, fmt.Errorf("OCR failed: %w", ocrErr)
 		}
-		content = text
+
+		return model.ProcessedFrame{
+			TimestampSec: frame.TimestampSec,
+			Type:         frameType,
+			ImagePath:    frame.FilePath,
+			OCRText:      text,
+			Useful:       true,
+		}, nil
 	}
 
-	if frameType == model.FrameTypeDiagram || frameType == model.FrameTypeOther {
-		prompt := "Describe the visual content of this image in detail. Focus on diagrams, charts, schemas, or any informational content."
-		text, visionErr := r.visionAnalyzer.AnalyzeImage(ctx, frame.FilePath, prompt)
-		if visionErr != nil {
-			return model.FrameContent{}, fmt.Errorf("vision analysis failed: %w", visionErr)
-		}
-		content = text
+	// diagram/other -> ask Vision API if useful; if unavailable, assume useful
+	useful, visionErr := r.visionAnalyzer.IsUsefulFrame(ctx, frame.FilePath)
+	if visionErr != nil {
+		logger.WarnKV(ctx, "vision usefulness check failed, assuming useful",
+			"frame_path", frame.FilePath,
+			"error", visionErr.Error(),
+		)
+		useful = true
 	}
 
-	return model.FrameContent{
+	return model.ProcessedFrame{
 		TimestampSec: frame.TimestampSec,
 		Type:         frameType,
-		Content:      content,
+		ImagePath:    frame.FilePath,
+		Useful:       useful,
 	}, nil
 }
