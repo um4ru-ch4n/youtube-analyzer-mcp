@@ -192,6 +192,30 @@ docker-compose logs -f mcp-server   # follow logs
 - **Ollama + Qwen3 8B** — text summarization (native, GPU)
 - **Gemini/Claude API** — optional Vision analysis for diagrams
 
+## VPN Split Tunneling
+
+If you use a VPN with split tunneling, add these domains to route through VPN:
+
+```
+# YouTube video download (yt-dlp)
+youtube.com
+*.youtube.com
+youtu.be
+*.googlevideo.com
+*.ytimg.com
+*.ggpht.com
+
+# Google API (Gemini Vision)
+*.googleapis.com
+
+# Docker Hub (image pull)
+registry-1.docker.io
+auth.docker.io
+production.cloudflare.docker.com
+```
+
+Without these, yt-dlp will fail with SSL handshake timeouts when downloading videos inside Docker containers.
+
 ## License
 
 MIT
