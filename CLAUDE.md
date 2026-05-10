@@ -98,6 +98,18 @@ docker-compose logs -f mcp-server        # follow logs
 
 MCP server runs in Docker (HTTP mode, port 39280). Ollama runs natively on host for GPU.
 
+Two startup modes:
+- `make start` — CPU mode (Mac, или Linux без NVIDIA).
+- `make start-gpu` — GPU mode (Windows/WSL2 с NVIDIA + nvidia-container-toolkit). Использует `docker-compose.gpu.yml` поверх базового compose, монтирует CUDA в whisper/clip, переключает их в `device=cuda`.
+
+`make stop` универсален для обеих платформ.
+
+### Ollama lifecycle
+`ollama-start` делает `ollama serve &` (фон). `ollama-stop` — `pkill ollama`.
+- На macOS если Ollama установлен через `brew services start ollama` (демон launchd) — `pkill` его убьёт, но launchd может перезапустить. Тогда останавливать вручную: `brew services stop ollama`.
+- На Linux/WSL `pkill` достаточно.
+- Перед стартом `ollama-start` проверяет `ollama ps` — если уже работает, не дублирует процесс.
+
 Claude Code config (`~/.claude.json`):
 ```json
 "youtube-analyzer": {

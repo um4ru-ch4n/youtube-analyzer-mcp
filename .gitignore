@@ -31,6 +31,12 @@ Thumbs.db
 # Environment
 .env
 
+# yt-dlp cookies (contains session tokens)
+cookies.txt
+
+# Downloaded analysis results
+Downloads/
+
 # Data directory (runtime artifacts)
 data/
 
