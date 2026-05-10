@@ -172,16 +172,18 @@ func (r *Runner) dedupByEmbedding(ctx context.Context, taskID string, frames []c
 }
 
 // runHeavySteps applies the type-specific work (OCR for slide/code, Vision
-// API for diagram/other) to frames that survived dedup.
+// API for diagram/other) to frames that survived dedup. Order of input frames
+// is preserved in the output — callers (e.g. matchArtifacts) rely on this to
+// produce chronologically ordered artifact lists per chunk.
 func (r *Runner) runHeavySteps(ctx context.Context, state *State, frames []classifiedFrame, maxConcurrent int) []model.ProcessedFrame {
 	sem := make(chan struct{}, maxConcurrent)
-	processed := make([]model.ProcessedFrame, 0, len(frames))
-	var mu sync.Mutex
+	results := make([]model.ProcessedFrame, len(frames))
+	var warnMu sync.Mutex
 	var wg sync.WaitGroup
 
-	for _, cf := range frames {
+	for i, cf := range frames {
 		wg.Add(1)
-		go func(cf classifiedFrame) {
+		go func(idx int, cf classifiedFrame) {
 			defer wg.Done()
 			sem <- struct{}{}
 			defer func() { <-sem }()
@@ -193,30 +195,28 @@ func (r *Runner) runHeavySteps(ctx context.Context, state *State, frames []class
 					"frame_path", cf.frame.FilePath,
 					"error", err.Error(),
 				)
-				mu.Lock()
+				warnMu.Lock()
 				state.Warnings = append(state.Warnings, model.Warning{
 					Step:      "process_frames",
 					Message:   fmt.Sprintf("frame at %.1fs (%s): %v", cf.frame.TimestampSec, cf.frame.FilePath, err),
 					Timestamp: time.Now().UTC(),
 				})
-				processed = append(processed, model.ProcessedFrame{
+				warnMu.Unlock()
+				results[idx] = model.ProcessedFrame{
 					TimestampSec: cf.frame.TimestampSec,
 					Type:         model.FrameTypeOther,
 					ImagePath:    cf.frame.FilePath,
 					Useful:       true,
-				})
-				mu.Unlock()
+				}
 				return
 			}
 
-			mu.Lock()
-			processed = append(processed, pf)
-			mu.Unlock()
-		}(cf)
+			results[idx] = pf
+		}(i, cf)
 	}
 
 	wg.Wait()
-	return processed
+	return results
 }
 
 func (r *Runner) applyHeavyStep(ctx context.Context, cf classifiedFrame) (model.ProcessedFrame, error) {
