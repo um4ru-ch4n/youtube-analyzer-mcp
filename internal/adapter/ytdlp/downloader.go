@@ -16,11 +16,23 @@ import (
 )
 
 type Downloader struct {
-	logger *zap.Logger
+	logger      *zap.Logger
+	cookiesFile string
 }
 
 func New(logger *zap.Logger) *Downloader {
-	return &Downloader{logger: logger}
+	return &Downloader{
+		logger:      logger,
+		cookiesFile: os.Getenv("YTDLP_COOKIES"),
+	}
+}
+
+func (d *Downloader) baseArgs() []string {
+	args := []string{"--js-runtimes", "node", "--remote-components", "ejs:github"}
+	if d.cookiesFile != "" {
+		args = append(args, "--cookies", d.cookiesFile)
+	}
+	return args
 }
 
 type ytdlpMeta struct {
@@ -32,21 +44,21 @@ func (d *Downloader) Download(ctx context.Context, url, outputDir string) (model
 	videoPath := filepath.Join(outputDir, "video.mp4")
 	audioPath := filepath.Join(outputDir, "audio.wav")
 
-	videoArgs := []string{
+	videoArgs := append(d.baseArgs(), []string{
 		"-f", "bestvideo[height<=1080]+bestaudio/best",
 		"--merge-output-format", "mp4",
 		"-o", videoPath,
 		url,
-	}
+	}...)
 	if err := d.runCmd(ctx, "yt-dlp", videoArgs); err != nil {
 		return model.DownloadResult{}, fmt.Errorf("download video: %w", err)
 	}
 
-	audioArgs := []string{
+	audioArgs := append(d.baseArgs(), []string{
 		"-x", "--audio-format", "wav",
 		"-o", audioPath,
 		url,
-	}
+	}...)
 	if err := d.runCmd(ctx, "yt-dlp", audioArgs); err != nil {
 		return model.DownloadResult{}, fmt.Errorf("extract audio: %w", err)
 	}
@@ -76,7 +88,7 @@ func (d *Downloader) Download(ctx context.Context, url, outputDir string) (model
 func (d *Downloader) downloadSubtitles(ctx context.Context, url, outputDir string) string {
 	subsBase := filepath.Join(outputDir, "subs")
 
-	args := []string{
+	args := append(d.baseArgs(), []string{
 		"--write-subs",
 		"--write-auto-subs",
 		"--sub-lang", "en,ru",
@@ -84,7 +96,7 @@ func (d *Downloader) downloadSubtitles(ctx context.Context, url, outputDir strin
 		"--skip-download",
 		"-o", subsBase,
 		url,
-	}
+	}...)
 
 	d.logger.Info("attempting subtitle download", zap.Strings("args", args))
 
@@ -110,7 +122,7 @@ func (d *Downloader) downloadSubtitles(ctx context.Context, url, outputDir strin
 }
 
 func (d *Downloader) fetchMeta(ctx context.Context, url string) (ytdlpMeta, error) {
-	args := []string{"--dump-json", url}
+	args := append(d.baseArgs(), "--dump-json", url)
 
 	d.logger.Info("running yt-dlp metadata", zap.Strings("args", args))
 

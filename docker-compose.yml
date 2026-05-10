@@ -10,6 +10,7 @@ services:
       - APP_ENV=development
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - YTDLP_COOKIES=/data/cookies.txt
     ports:
       - "39280:39280"
     # depends_on removed — start immediately, sidecars connect when ready

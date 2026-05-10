@@ -18,7 +18,8 @@ RUN apk add --no-cache \
     tesseract-ocr-data-eng \
     tesseract-ocr-data-rus \
     python3 \
-    py3-pip
+    py3-pip \
+    nodejs
 
 RUN pip3 install --break-system-packages yt-dlp
 
