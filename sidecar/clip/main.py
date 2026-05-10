@@ -14,10 +14,11 @@ log = logging.getLogger("clip-sidecar")
 
 MODEL_NAME = os.getenv("CLIP_MODEL", "openai/clip-vit-large-patch14")
 
-log.info("Loading CLIP model=%s", MODEL_NAME)
-model = CLIPModel.from_pretrained(MODEL_NAME)
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+log.info("Loading CLIP model=%s device=%s", MODEL_NAME, DEVICE)
+model = CLIPModel.from_pretrained(MODEL_NAME).to(DEVICE)
 processor = CLIPProcessor.from_pretrained(MODEL_NAME)
-log.info("Model loaded successfully")
+log.info("Model loaded successfully on %s", DEVICE)
 
 LABELS = ["talking head webcam", "slide with text", "code or terminal", "diagram schema chart", "other"]
 LABEL_MAP = {
@@ -50,6 +51,7 @@ def classify_image(image_path: str) -> ClassifyResponse:
 
     image = Image.open(image_path).convert("RGB")
     inputs = processor(text=LABELS, images=image, return_tensors="pt", padding=True)
+    inputs = {k: v.to(DEVICE) for k, v in inputs.items()}
 
     with torch.no_grad():
         outputs = model(**inputs)

@@ -1,0 +1,27 @@
+services:
+  whisper:
+    build:
+      context: ./sidecar/whisper
+      dockerfile: Dockerfile.gpu
+    environment:
+      - WHISPER_DEVICE=cuda
+      - WHISPER_COMPUTE_TYPE=float16
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  clip:
+    build:
+      context: ./sidecar/clip
+      dockerfile: Dockerfile.gpu
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]

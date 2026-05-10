@@ -1,8 +1,10 @@
-.PHONY: help setup start stop restart logs status \
+.PHONY: help setup setup-gpu start start-gpu stop restart logs status \
        ollama-setup ollama-start ollama-stop \
        build test lint run \
-       docker-build docker-up docker-down docker-logs \
+       docker-build docker-build-gpu docker-up docker-up-gpu docker-down docker-logs \
        clean
+
+COMPOSE_GPU = docker-compose -f docker-compose.yml -f docker-compose.gpu.yml
 
 # Default
 help: ## Show this help
@@ -11,20 +13,31 @@ help: ## Show this help
 
 # ── Full Setup ──────────────────────────────────────────────
 
-setup: ollama-setup docker-build ## First-time setup: install Ollama model + build Docker images
+setup: ollama-setup docker-build ## First-time setup (CPU/Mac): install Ollama model + build Docker images
 	@echo ""
-	@echo "✅ Setup complete. Run 'make start' to launch everything."
+	@echo "✅ Setup complete. Run 'make start' to launch."
 
-start: ollama-start docker-up ## Start everything: Ollama + MCP server + sidecars
+setup-gpu: ollama-setup docker-build-gpu ## First-time setup (GPU/Windows): install Ollama model + build GPU Docker images
 	@echo ""
-	@echo "✅ All services running."
+	@echo "✅ GPU setup complete. Run 'make start-gpu' to launch."
+
+start: ollama-start docker-up ## Start everything (CPU/Mac): Ollama + MCP server + sidecars
+	@echo ""
+	@echo "✅ All services running (CPU mode)."
 	@echo "   MCP endpoint: http://localhost:39280/mcp"
-	@echo "   Add to ~/.claude.json:"
+	@echo '   "youtube-analyzer": {"type": "http", "url": "http://localhost:39280/mcp"}'
+
+start-gpu: ollama-start docker-up-gpu ## Start everything (GPU/Windows): Ollama + MCP server + sidecars with CUDA
+	@echo ""
+	@echo "✅ All services running (GPU mode)."
+	@echo "   MCP endpoint: http://localhost:39280/mcp"
 	@echo '   "youtube-analyzer": {"type": "http", "url": "http://localhost:39280/mcp"}'
 
 stop: docker-down ollama-stop ## Stop everything
 
-restart: stop start ## Restart everything
+restart: stop start ## Restart everything (CPU)
+
+restart-gpu: stop start-gpu ## Restart everything (GPU)
 
 status: ## Show status of all services
 	@echo "=== Docker services ==="
@@ -39,7 +52,7 @@ logs: ## Follow MCP server logs
 # ── Ollama ──────────────────────────────────────────────────
 
 ollama-setup: ## Install Ollama model (qwen3:8b, ~5GB)
-	@command -v ollama >/dev/null 2>&1 || { echo "❌ Ollama not installed. Run: brew install ollama"; exit 1; }
+	@command -v ollama >/dev/null 2>&1 || { echo "❌ Ollama not installed. See https://ollama.com/download"; exit 1; }
 	@echo "Pulling qwen3:8b model..."
 	ollama pull qwen3:8b
 
@@ -48,20 +61,26 @@ ollama-start: ## Start Ollama service
 		echo "Ollama already running"; \
 	else \
 		echo "Starting Ollama..."; \
-		brew services start ollama 2>/dev/null || ollama serve &; \
+		ollama serve >/dev/null 2>&1 & \
 		sleep 3; \
 	fi
 
 ollama-stop: ## Stop Ollama service
-	@brew services stop ollama 2>/dev/null || pkill ollama 2>/dev/null || true
+	@pkill ollama 2>/dev/null || true
 
 # ── Docker ──────────────────────────────────────────────────
 
-docker-build: ## Build Docker images
-	docker-compose build
+docker-build: ## Build CPU Docker images
+	docker-compose build mcp-server whisper clip
 
-docker-up: ## Start Docker services (MCP server + whisper + clip)
+docker-build-gpu: ## Build GPU Docker images
+	$(COMPOSE_GPU) build mcp-server whisper clip
+
+docker-up: ## Start Docker services in CPU mode
 	docker-compose up -d mcp-server whisper clip
+
+docker-up-gpu: ## Start Docker services in GPU mode
+	$(COMPOSE_GPU) up -d mcp-server whisper clip
 
 docker-down: ## Stop Docker services
 	docker-compose down
