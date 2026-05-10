@@ -9,6 +9,7 @@ pipeline:
   scene_detect_max_frames: 500
   fallback_interval_sec: 5
   dedup_similarity_threshold: 0.95
+  embedding_dedup_threshold: 0.95
 
 worker_pool:
   size: 2

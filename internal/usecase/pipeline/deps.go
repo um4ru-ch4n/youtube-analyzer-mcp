@@ -20,6 +20,7 @@ type FrameExtractor interface {
 
 type FrameClassifier interface {
 	Classify(ctx context.Context, imagePath string) (model.FrameClassification, error)
+	ClassifyWithEmbedding(ctx context.Context, imagePath string) (model.FrameClassification, error)
 	ClassifyBatch(ctx context.Context, paths []string) ([]model.FrameClassification, error)
 }
 

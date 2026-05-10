@@ -22,6 +22,9 @@ type Frame struct {
 type FrameClassification struct {
 	Type       FrameType `json:"type"`
 	Confidence float64   `json:"confidence"`
+	// Embedding is L2-normalized image embedding from CLIP (typically 768-dim).
+	// Empty when classification was done via /classify (without embedding).
+	Embedding []float32 `json:"embedding,omitempty"`
 }
 
 // ProcessedFrame is a frame after CLIP classification + optional OCR.

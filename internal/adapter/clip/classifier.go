@@ -39,6 +39,48 @@ type classifyResponse struct {
 	Confidence float64 `json:"confidence"`
 }
 
+type classifyWithEmbeddingResponse struct {
+	Type       string    `json:"type"`
+	Confidence float64   `json:"confidence"`
+	Embedding  []float32 `json:"embedding"`
+}
+
+func (c *Classifier) ClassifyWithEmbedding(ctx context.Context, imagePath string) (model.FrameClassification, error) {
+	reqBody, err := json.Marshal(classifyRequest{ImagePath: imagePath})
+	if err != nil {
+		return model.FrameClassification{}, fmt.Errorf("marshal request: %w", err)
+	}
+
+	endpoint := c.baseURL + "/classify_with_embedding"
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(reqBody))
+	if err != nil {
+		return model.FrameClassification{}, fmt.Errorf("create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return model.FrameClassification{}, fmt.Errorf("clip request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return model.FrameClassification{}, fmt.Errorf("clip returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var result classifyWithEmbeddingResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return model.FrameClassification{}, fmt.Errorf("decode response: %w", err)
+	}
+
+	return model.FrameClassification{
+		Type:       model.FrameType(result.Type),
+		Confidence: result.Confidence,
+		Embedding:  result.Embedding,
+	}, nil
+}
+
 func (c *Classifier) Classify(ctx context.Context, imagePath string) (model.FrameClassification, error) {
 	reqBody, err := json.Marshal(classifyRequest{ImagePath: imagePath})
 	if err != nil {

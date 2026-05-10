@@ -32,6 +32,10 @@ type PipelineConfig struct {
 	SceneDetectMaxFrames     int     `mapstructure:"scene_detect_max_frames"`
 	FallbackIntervalSec      int     `mapstructure:"fallback_interval_sec"`
 	DedupSimilarityThreshold float64 `mapstructure:"dedup_similarity_threshold"`
+	// EmbeddingDedupThreshold — порог cosine similarity (0..1) для дедупликации
+	// по CLIP-эмбеддингам. Кадр считается дублем предыдущего keep'нутого, если
+	// cosine >= threshold. Типичные значения: 0.95-0.98. 0 или меньше — отключено.
+	EmbeddingDedupThreshold float64 `mapstructure:"embedding_dedup_threshold"`
 }
 
 type WorkerPoolConfig struct {

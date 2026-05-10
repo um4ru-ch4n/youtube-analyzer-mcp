@@ -45,7 +45,13 @@ class ClassifyResponse(BaseModel):
     confidence: float
 
 
-def classify_image(image_path: str) -> ClassifyResponse:
+class ClassifyWithEmbeddingResponse(BaseModel):
+    type: str
+    confidence: float
+    embedding: list[float]
+
+
+def _classify_with_embedding(image_path: str) -> ClassifyWithEmbeddingResponse:
     if not os.path.exists(image_path):
         raise HTTPException(status_code=400, detail=f"File not found: {image_path}")
 
@@ -63,16 +69,32 @@ def classify_image(image_path: str) -> ClassifyResponse:
     best_label = LABELS[best_idx]
     best_confidence = round(probs[best_idx].item(), 4)
 
-    return ClassifyResponse(
+    image_embeds = outputs.image_embeds[0]
+    image_embeds = image_embeds / image_embeds.norm(p=2, dim=-1, keepdim=True)
+    embedding = image_embeds.cpu().tolist()
+
+    return ClassifyWithEmbeddingResponse(
         type=LABEL_MAP[best_label],
         confidence=best_confidence,
+        embedding=embedding,
     )
+
+
+def classify_image(image_path: str) -> ClassifyResponse:
+    full = _classify_with_embedding(image_path)
+    return ClassifyResponse(type=full.type, confidence=full.confidence)
 
 
 @app.post("/classify", response_model=ClassifyResponse)
 def classify(req: ClassifyRequest):
     log.info("Classifying %s", req.image_path)
     return classify_image(req.image_path)
+
+
+@app.post("/classify_with_embedding", response_model=ClassifyWithEmbeddingResponse)
+def classify_with_embedding(req: ClassifyRequest):
+    log.info("Classifying with embedding %s", req.image_path)
+    return _classify_with_embedding(req.image_path)
 
 
 @app.post("/classify_batch", response_model=list[ClassifyResponse])
