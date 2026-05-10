@@ -36,7 +36,7 @@ type Container struct {
 	Extractor      *ffmpeg.Extractor
 	Transcriber    *whisper.Transcriber
 	Classifier     *clip.Classifier
-	OCRReader      *ocr.Reader
+	OCRReader      pipeline.OCRReader
 	Deduplicator   *phash.Deduplicator
 	VisionAnalyzer pipeline.VisionAnalyzer
 	Summarizer     *summarizer.OllamaSummarizer
@@ -72,7 +72,14 @@ func New(cfg *config.Config, env *config.EnvConfig) (*Container, error) {
 
 	classifier := clip.New(cfg.Clip.URL, cfg.Clip.TimeoutSec)
 
-	ocrReader := ocr.New(cfg.OCR.URL, cfg.OCR.TimeoutSec, zapLogger)
+	var ocrReader pipeline.OCRReader
+	if cfg.OCR.Enabled {
+		zapLogger.Info("OCR enabled, using EasyOCR sidecar", zap.String("url", cfg.OCR.URL))
+		ocrReader = ocr.New(cfg.OCR.URL, cfg.OCR.TimeoutSec, zapLogger)
+	} else {
+		zapLogger.Info("OCR disabled, slide/code frames will pass through without text")
+		ocrReader = ocr.NewNoop()
+	}
 
 	deduplicator := phash.New(cfg.Pipeline.DedupSimilarityThreshold, zapLogger)
 

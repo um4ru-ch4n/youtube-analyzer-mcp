@@ -86,6 +86,11 @@ type OllamaConfig struct {
 }
 
 type OCRConfig struct {
+	// Enabled включает OCR в pipeline. По умолчанию false: vision-консумеры
+	// (Claude Code и пр.) сами читают картинки лучше любого OCR. Включай только
+	// если твой потребитель саммари — text-only LLM или нужен текстовый поиск
+	// по слайдам.
+	Enabled    bool     `mapstructure:"enabled"`
 	URL        string   `mapstructure:"url"`
 	TimeoutSec int      `mapstructure:"timeout_sec"`
 	Languages  []string `mapstructure:"languages"`
