@@ -40,3 +40,10 @@ type Summarizer interface {
 type Deduplicator interface {
 	FilterDuplicates(ctx context.Context, frames []model.Frame) ([]model.Frame, error)
 }
+
+// VRAMReleaser is implemented by GPU-using clients that can free their CUDA
+// memory cache. Pipeline calls it after processing_frames to leave room for
+// Ollama (Qwen) on the same GPU.
+type VRAMReleaser interface {
+	ReleaseVRAM(ctx context.Context) error
+}

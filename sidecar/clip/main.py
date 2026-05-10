@@ -85,25 +85,47 @@ def classify_image(image_path: str) -> ClassifyResponse:
     return ClassifyResponse(type=full.type, confidence=full.confidence)
 
 
+def _release_vram():
+    if DEVICE == "cuda":
+        torch.cuda.empty_cache()
+
+
 @app.post("/classify", response_model=ClassifyResponse)
 def classify(req: ClassifyRequest):
     log.info("Classifying %s", req.image_path)
-    return classify_image(req.image_path)
+    try:
+        return classify_image(req.image_path)
+    finally:
+        _release_vram()
 
 
 @app.post("/classify_with_embedding", response_model=ClassifyWithEmbeddingResponse)
 def classify_with_embedding(req: ClassifyRequest):
     log.info("Classifying with embedding %s", req.image_path)
-    return _classify_with_embedding(req.image_path)
+    try:
+        return _classify_with_embedding(req.image_path)
+    finally:
+        _release_vram()
 
 
 @app.post("/classify_batch", response_model=list[ClassifyResponse])
 def classify_batch(req: ClassifyBatchRequest):
     log.info("Classifying batch of %d images", len(req.image_paths))
-    results = []
-    for path in req.image_paths:
-        results.append(classify_image(path))
-    return results
+    try:
+        results = []
+        for path in req.image_paths:
+            results.append(classify_image(path))
+        return results
+    finally:
+        _release_vram()
+
+
+@app.post("/release_vram")
+def release_vram():
+    """Manually trigger CUDA cache release. Useful after a batch of work
+    when caller wants to free vRAM for other GPU tenants (Ollama)."""
+    _release_vram()
+    return {"status": "ok"}
 
 
 @app.post("/health")

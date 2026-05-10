@@ -53,7 +53,25 @@ func (r *Runner) processFrames(ctx context.Context, state *State) error {
 		"useful", usefulCount,
 	)
 
+	// Free GPU memory on sidecars before the summarization step kicks in —
+	// Ollama needs ~6GB on the same card for qwen3:8b, and PyTorch's reserved
+	// memory pool will otherwise hold it hostage.
+	r.releaseSidecarVRAM(ctx)
+
 	return nil
+}
+
+func (r *Runner) releaseSidecarVRAM(ctx context.Context) {
+	if releaser, ok := r.frameClassifier.(VRAMReleaser); ok {
+		if err := releaser.ReleaseVRAM(ctx); err != nil {
+			logger.WarnKV(ctx, "clip release_vram failed", "error", err.Error())
+		}
+	}
+	if releaser, ok := r.ocrReader.(VRAMReleaser); ok {
+		if err := releaser.ReleaseVRAM(ctx); err != nil {
+			logger.WarnKV(ctx, "ocr release_vram failed", "error", err.Error())
+		}
+	}
 }
 
 // classifyAll runs CLIP /classify_with_embedding concurrently on every frame.

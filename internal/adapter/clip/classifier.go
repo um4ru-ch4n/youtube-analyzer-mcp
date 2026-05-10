@@ -155,3 +155,21 @@ func (c *Classifier) ClassifyBatch(ctx context.Context, paths []string) ([]model
 
 	return classifications, nil
 }
+
+// ReleaseVRAM tells the sidecar to drop its CUDA cache. Use after a batch of
+// classification work to free memory for other GPU tenants (e.g. Ollama).
+func (c *Classifier) ReleaseVRAM(ctx context.Context) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/release_vram", nil)
+	if err != nil {
+		return fmt.Errorf("create request: %w", err)
+	}
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("clip release_vram: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("clip release_vram returned %d", resp.StatusCode)
+	}
+	return nil
+}

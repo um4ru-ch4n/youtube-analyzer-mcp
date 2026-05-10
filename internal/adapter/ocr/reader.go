@@ -70,3 +70,20 @@ func (r *Reader) ReadText(ctx context.Context, imagePath string) (string, error)
 
 	return result.Text, nil
 }
+
+// ReleaseVRAM tells the sidecar to drop its CUDA cache.
+func (r *Reader) ReleaseVRAM(ctx context.Context) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, r.baseURL+"/release_vram", nil)
+	if err != nil {
+		return fmt.Errorf("create request: %w", err)
+	}
+	resp, err := r.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("ocr release_vram: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("ocr release_vram returned %d", resp.StatusCode)
+	}
+	return nil
+}
