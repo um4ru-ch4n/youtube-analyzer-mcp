@@ -3,38 +3,70 @@ package ocr
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
-	"os/exec"
-	"strings"
+	"io"
+	"net/http"
+	"time"
 
 	"go.uber.org/zap"
 )
 
+// Reader is an HTTP client to the OCR sidecar (EasyOCR-based, GPU-capable).
 type Reader struct {
-	languages []string
-	logger    *zap.Logger
+	httpClient *http.Client
+	baseURL    string
+	logger     *zap.Logger
 }
 
-func New(languages []string, logger *zap.Logger) *Reader {
-	return &Reader{languages: languages, logger: logger}
+func New(url string, timeoutSec int, logger *zap.Logger) *Reader {
+	if timeoutSec <= 0 {
+		timeoutSec = 120
+	}
+	return &Reader{
+		httpClient: &http.Client{Timeout: time.Duration(timeoutSec) * time.Second},
+		baseURL:    url,
+		logger:     logger,
+	}
+}
+
+type readRequest struct {
+	ImagePath string `json:"image_path"`
+}
+
+type readResponse struct {
+	Text string `json:"text"`
 }
 
 func (r *Reader) ReadText(ctx context.Context, imagePath string) (string, error) {
-	lang := strings.Join(r.languages, "+")
-
-	args := []string{imagePath, "stdout", "-l", lang}
-
-	r.logger.Info("running tesseract", zap.Strings("args", args))
-
-	cmd := exec.CommandContext(ctx, "tesseract", args...)
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	if err := cmd.Run(); err != nil {
-		r.logger.Error("tesseract failed", zap.String("stderr", stderr.String()), zap.Error(err))
-		return "", fmt.Errorf("tesseract: %w", err)
+	body, err := json.Marshal(readRequest{ImagePath: imagePath})
+	if err != nil {
+		return "", fmt.Errorf("marshal request: %w", err)
 	}
 
-	return strings.TrimSpace(stdout.String()), nil
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, r.baseURL+"/read", bytes.NewReader(body))
+	if err != nil {
+		return "", fmt.Errorf("create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	r.logger.Info("running OCR", zap.String("image", imagePath))
+
+	resp, err := r.httpClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("ocr request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		raw, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("ocr returned status %d: %s", resp.StatusCode, string(raw))
+	}
+
+	var result readResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", fmt.Errorf("decode ocr response: %w", err)
+	}
+
+	return result.Text, nil
 }

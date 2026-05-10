@@ -86,7 +86,9 @@ type OllamaConfig struct {
 }
 
 type OCRConfig struct {
-	Languages []string `mapstructure:"languages"`
+	URL        string   `mapstructure:"url"`
+	TimeoutSec int      `mapstructure:"timeout_sec"`
+	Languages  []string `mapstructure:"languages"`
 }
 
 type HTTPConfig struct {

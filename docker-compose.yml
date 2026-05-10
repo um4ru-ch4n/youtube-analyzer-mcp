@@ -31,6 +31,13 @@ services:
     environment:
       - CLIP_MODEL=${CLIP_MODEL:-openai/clip-vit-large-patch14}
 
+  ocr:
+    build: ./sidecar/ocr
+    volumes:
+      - shared-data:/data
+    environment:
+      - OCR_LANGUAGES=${OCR_LANGUAGES:-en,ru}
+
   ollama:
     image: ollama/ollama
     volumes:

@@ -71,16 +71,16 @@ ollama-stop: ## Stop Ollama service
 # ── Docker ──────────────────────────────────────────────────
 
 docker-build: ## Build CPU Docker images
-	docker-compose build mcp-server whisper clip
+	docker-compose build mcp-server whisper clip ocr
 
 docker-build-gpu: ## Build GPU Docker images
-	$(COMPOSE_GPU) build mcp-server whisper clip
+	$(COMPOSE_GPU) build mcp-server whisper clip ocr
 
 docker-up: ## Start Docker services in CPU mode
-	docker-compose up -d mcp-server whisper clip
+	docker-compose up -d mcp-server whisper clip ocr
 
 docker-up-gpu: ## Start Docker services in GPU mode
-	$(COMPOSE_GPU) up -d mcp-server whisper clip
+	$(COMPOSE_GPU) up -d mcp-server whisper clip ocr
 
 docker-down: ## Stop Docker services
 	docker-compose down

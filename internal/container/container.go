@@ -72,7 +72,7 @@ func New(cfg *config.Config, env *config.EnvConfig) (*Container, error) {
 
 	classifier := clip.New(cfg.Clip.URL, cfg.Clip.TimeoutSec)
 
-	ocrReader := ocr.New(cfg.OCR.Languages, zapLogger)
+	ocrReader := ocr.New(cfg.OCR.URL, cfg.OCR.TimeoutSec, zapLogger)
 
 	deduplicator := phash.New(cfg.Pipeline.DedupSimilarityThreshold, zapLogger)
 

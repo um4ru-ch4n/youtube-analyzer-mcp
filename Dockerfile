@@ -14,9 +14,6 @@ FROM alpine:3.21
 
 RUN apk add --no-cache \
     ffmpeg \
-    tesseract-ocr \
-    tesseract-ocr-data-eng \
-    tesseract-ocr-data-rus \
     python3 \
     py3-pip \
     nodejs

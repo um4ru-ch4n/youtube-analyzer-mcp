@@ -44,9 +44,11 @@ summarizer:
     timeout_sec: 300
 
 ocr:
+  url: "http://ocr:8003"
+  timeout_sec: 120
   languages:
-    - "eng"
-    - "rus"
+    - "en"
+    - "ru"
 
 http:
   port: 39280
