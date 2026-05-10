@@ -25,4 +25,5 @@ func (h *Handler) RegisterTools(s *server.MCPServer) {
 	h.registerGetArtifacts(s)
 	h.registerDeleteTask(s)
 	h.registerRetryTask(s)
+	h.registerUpdateCookies(s)
 }
