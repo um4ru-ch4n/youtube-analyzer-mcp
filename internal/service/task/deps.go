@@ -2,6 +2,7 @@ package task
 
 import (
 	"context"
+	"time"
 
 	"github.com/um4ru-ch4n/youtube-analyzer-mcp/internal/model"
 )
@@ -12,10 +13,11 @@ type TaskRepository interface {
 	Get(ctx context.Context, taskID string) (model.Task, error)
 	UpdateStatus(ctx context.Context, taskID string, status model.TaskStatus, progress string) error
 	UpdateWarnings(ctx context.Context, taskID string, warnings []model.Warning) error
-	SaveResult(ctx context.Context, taskID string, result model.TaskResult) error
+	SaveResult(ctx context.Context, taskID string, result model.TaskResult, processingDuration time.Duration) error
 	GetResult(ctx context.Context, taskID string) (model.TaskResult, error)
 	Delete(ctx context.Context, taskID string) error
 	List(ctx context.Context, limit, offset int) ([]model.Task, error)
+	ListCompleted(ctx context.Context, limit, offset int) ([]model.VideoSummary, error)
 }
 
 // PipelineRunner executes the full analysis pipeline for a given task.

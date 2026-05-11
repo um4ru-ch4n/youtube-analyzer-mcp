@@ -26,4 +26,5 @@ func (h *Handler) RegisterTools(s *server.MCPServer) {
 	h.registerDeleteTask(s)
 	h.registerRetryTask(s)
 	h.registerUpdateCookies(s)
+	h.registerListVideos(s)
 }

@@ -97,7 +97,7 @@ func TestFullLifecycle(t *testing.T) {
 		DurationSeconds: 120.5,
 	}
 
-	if err := repo.SaveResult(ctx, "task-001", result); err != nil {
+	if err := repo.SaveResult(ctx, "task-001", result, 5*time.Minute); err != nil {
 		t.Fatalf("SaveResult: %v", err)
 	}
 

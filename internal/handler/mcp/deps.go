@@ -13,4 +13,5 @@ type TaskService interface {
 	GetResult(ctx context.Context, taskID string) (model.TaskResult, error)
 	Delete(ctx context.Context, taskID string) error
 	Retry(ctx context.Context, taskID string) error
+	ListVideos(ctx context.Context, limit, offset int) ([]model.VideoSummary, error)
 }

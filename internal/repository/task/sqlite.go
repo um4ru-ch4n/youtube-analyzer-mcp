@@ -149,15 +149,20 @@ func (r *Repository) UpdateWarnings(ctx context.Context, taskID string, warnings
 }
 
 // SaveResult stores the task result as JSON and marks the task as completed.
-func (r *Repository) SaveResult(ctx context.Context, taskID string, result model.TaskResult) error {
+func (r *Repository) SaveResult(ctx context.Context, taskID string, result model.TaskResult, processingDuration time.Duration) error {
 	resultJSON, err := json.Marshal(result)
 	if err != nil {
 		return fmt.Errorf("marshal result: %w", err)
 	}
 
 	res, err := r.db.ExecContext(ctx,
-		`UPDATE tasks SET result_json = ?, status = ?, updated_at = ? WHERE id = ?`,
-		string(resultJSON), string(model.TaskStatusCompleted), time.Now().UTC(), taskID,
+		`UPDATE tasks SET result_json = ?, status = ?, updated_at = ?,
+		     video_title = ?, duration_seconds = ?, chunk_count = ?, processing_seconds = ?
+		 WHERE id = ?`,
+		string(resultJSON), string(model.TaskStatusCompleted), time.Now().UTC(),
+		result.VideoMeta.Title, result.DurationSeconds, len(result.Chunks),
+		processingDuration.Seconds(),
+		taskID,
 	)
 	if err != nil {
 		return fmt.Errorf("save result: %w", err)
@@ -242,6 +247,36 @@ func (r *Repository) List(ctx context.Context, limit, offset int) ([]model.Task,
 	}
 
 	return tasks, nil
+}
+
+// ListCompleted returns all completed tasks with denormalized video metadata,
+// ordered by creation time descending. Used by the list_videos MCP tool for cross-session discovery.
+func (r *Repository) ListCompleted(ctx context.Context, limit, offset int) ([]model.VideoSummary, error) {
+	rows, err := r.db.QueryContext(ctx,
+		`SELECT id, video_url, video_title, duration_seconds, chunk_count, processing_seconds, created_at
+		 FROM tasks WHERE status = 'completed'
+		 ORDER BY created_at DESC LIMIT ? OFFSET ?`,
+		limit, offset,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("query completed tasks: %w", err)
+	}
+	defer rows.Close()
+
+	var result []model.VideoSummary
+	for rows.Next() {
+		var v model.VideoSummary
+		var createdAt string
+		if err := rows.Scan(&v.TaskID, &v.VideoURL, &v.VideoTitle, &v.DurationSeconds, &v.ChunkCount, &v.ProcessingSeconds, &createdAt); err != nil {
+			return nil, fmt.Errorf("scan video summary: %w", err)
+		}
+		v.AnalyzedAt, _ = parseTime(createdAt)
+		result = append(result, v)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("rows iteration: %w", err)
+	}
+	return result, nil
 }
 
 // Close closes the underlying database connection.

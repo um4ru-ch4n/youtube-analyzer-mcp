@@ -270,4 +270,16 @@ func (r *Runner) cleanup(ctx context.Context, state *State) {
 			logger.DebugKV(ctx, "failed to remove audio file", "path", audioPath, "error", err.Error())
 		}
 	}
+
+	if state.TempDir != "" {
+		processingDir := filepath.Join(state.TempDir, "processing")
+		if err := os.RemoveAll(processingDir); err != nil {
+			logger.WarnKV(ctx, "failed to remove processing dir", "path", processingDir, "error", err.Error())
+		}
+
+		checkpointPath := filepath.Join(state.TempDir, "checkpoint.json")
+		if err := os.Remove(checkpointPath); err != nil && !os.IsNotExist(err) {
+			logger.WarnKV(ctx, "failed to remove checkpoint", "path", checkpointPath, "error", err.Error())
+		}
+	}
 }

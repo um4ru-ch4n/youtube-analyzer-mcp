@@ -126,6 +126,11 @@ func (m *Manager) Delete(ctx context.Context, taskID string) error {
 	return nil
 }
 
+// ListVideos returns all completed tasks with video metadata for cross-session discovery.
+func (m *Manager) ListVideos(ctx context.Context, limit, offset int) ([]model.VideoSummary, error) {
+	return m.repo.ListCompleted(ctx, limit, offset)
+}
+
 // Retry re-enqueues a failed task for processing. The pipeline will resume
 // from the last checkpoint, skipping already completed steps.
 func (m *Manager) Retry(ctx context.Context, taskID string) error {

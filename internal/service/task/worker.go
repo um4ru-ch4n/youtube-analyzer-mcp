@@ -2,6 +2,7 @@ package task
 
 import (
 	"context"
+	"time"
 
 	"github.com/um4ru-ch4n/youtube-analyzer-mcp/internal/model"
 	"github.com/um4ru-ch4n/youtube-analyzer-mcp/pkg/logger"
@@ -39,7 +40,10 @@ func (m *Manager) processTask(ctx context.Context, taskID string) {
 		return
 	}
 
+	pipelineStart := time.Now()
 	result, err := m.pipeline.Run(ctx, task)
+	processingDuration := time.Since(pipelineStart)
+
 	if err != nil {
 		logger.ErrorKV(ctx, "pipeline failed", "error", err.Error())
 
@@ -51,7 +55,7 @@ func (m *Manager) processTask(ctx context.Context, taskID string) {
 		return
 	}
 
-	err = m.repo.SaveResult(ctx, taskID, result)
+	err = m.repo.SaveResult(ctx, taskID, result, processingDuration)
 	if err != nil {
 		logger.ErrorKV(ctx, "failed to save task result", "error", err.Error())
 

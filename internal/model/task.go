@@ -49,3 +49,14 @@ type Warning struct {
 	Message   string    `json:"message"`
 	Timestamp time.Time `json:"timestamp"`
 }
+
+// VideoSummary is a lightweight view of a completed task for cross-session discovery.
+type VideoSummary struct {
+	TaskID            string    `json:"task_id"`
+	VideoURL          string    `json:"video_url"`
+	VideoTitle        string    `json:"video_title"`
+	DurationSeconds   float64   `json:"duration_seconds"`
+	ChunkCount        int       `json:"chunk_count"`
+	ProcessingSeconds float64   `json:"processing_seconds"`
+	AnalyzedAt        time.Time `json:"analyzed_at"`
+}
