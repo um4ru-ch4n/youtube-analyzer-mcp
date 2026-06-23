@@ -3,6 +3,7 @@ package task
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"time"
@@ -70,6 +71,44 @@ func (m *Manager) Submit(ctx context.Context, videoURL string) (string, error) {
 		logger.InfoKV(ctx, "task enqueued", "task_id", taskID, "video_url", videoURL)
 	case <-ctx.Done():
 		return "", fmt.Errorf("enqueue task: %w", ctx.Err())
+	}
+
+	return taskID, nil
+}
+
+// SubmitLocal queues an already-uploaded local file for analysis. The path is
+// encoded as `file://<path>#title=<urlencoded>` so the pipeline runner can
+// recover both fields without widening the Task model or the worker queue.
+func (m *Manager) SubmitLocal(ctx context.Context, path, title string) (string, error) {
+	taskID := uuid.New().String()
+
+	encoded := "file://" + path
+	if title != "" {
+		v := url.Values{}
+		v.Set("title", title)
+		encoded += "#" + v.Encode()
+	}
+
+	now := time.Now().UTC()
+	task := model.Task{
+		ID:        taskID,
+		VideoURL:  encoded,
+		Status:    model.TaskStatusQueued,
+		Progress:  string(model.TaskStatusQueued),
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+
+	err := m.repo.Create(ctx, task)
+	if err != nil {
+		return "", fmt.Errorf("create local task: %w", err)
+	}
+
+	select {
+	case m.queue <- taskID:
+		logger.InfoKV(ctx, "local task enqueued", "task_id", taskID, "path", path, "title", title)
+	case <-ctx.Done():
+		return "", fmt.Errorf("enqueue local task: %w", ctx.Err())
 	}
 
 	return taskID, nil

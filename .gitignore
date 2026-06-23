@@ -40,6 +40,9 @@ Downloads/
 # Data directory (runtime artifacts)
 data/
 
+# Local uploads (for add_local_video)
+/uploads/
+
 # Temporary files
 tmp/
 *.tmp

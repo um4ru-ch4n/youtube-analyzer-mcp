@@ -3,6 +3,7 @@ services:
     build: .
     volumes:
       - shared-data:/data
+      - ./uploads:/data/uploads
     environment:
       - TRANSPORT_MODE=http
       - HTTP_PORT=39280

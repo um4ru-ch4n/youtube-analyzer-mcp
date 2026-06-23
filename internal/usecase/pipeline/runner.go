@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,6 +14,29 @@ import (
 	"github.com/um4ru-ch4n/youtube-analyzer-mcp/internal/model"
 	"github.com/um4ru-ch4n/youtube-analyzer-mcp/pkg/logger"
 )
+
+// parseLocalURL recognises `file://<absolute-path>` (optionally with `#title=…`
+// fragment) produced by SubmitLocal. Returns the decoded path, the optional
+// title, and true on a match.
+func parseLocalURL(raw string) (path, title string, ok bool) {
+	if !strings.HasPrefix(raw, "file://") {
+		return "", "", false
+	}
+	u, err := url.Parse(raw)
+	if err != nil {
+		return "", "", false
+	}
+	path = u.Path
+	if path == "" {
+		return "", "", false
+	}
+	if frag := u.Fragment; frag != "" {
+		if v, err := url.ParseQuery(frag); err == nil {
+			title = v.Get("title")
+		}
+	}
+	return path, title, true
+}
 
 // StatusUpdater persists task status changes during pipeline execution.
 type StatusUpdater interface {
@@ -90,16 +114,28 @@ func (r *Runner) Run(ctx context.Context, task model.Task) (model.TaskResult, er
 			VideoURL: task.VideoURL,
 			TempDir:  taskDir,
 		}
+		if path, title, ok := parseLocalURL(task.VideoURL); ok {
+			state.IsLocal = true
+			state.LocalPath = path
+			state.LocalTitle = title
+		}
 	}
 
-	// Step 1: Download (skip if already done)
+	// Step 1: Source acquisition (skip if already done).
 	if state.LastStep < "01_download" {
 		if err := r.updateStatus(ctx, state, model.TaskStatusDownloading); err != nil {
 			return model.TaskResult{}, err
 		}
 
-		if err := r.download(ctx, state); err != nil {
-			return model.TaskResult{}, model.PipelineError{Step: "download", Cause: err}
+		if state.IsLocal {
+			if err := r.prepareLocal(ctx, state); err != nil {
+				return model.TaskResult{}, model.PipelineError{Step: "prepare_local", Cause: err}
+			}
+		}
+		if !state.IsLocal {
+			if err := r.download(ctx, state); err != nil {
+				return model.TaskResult{}, model.PipelineError{Step: "download", Cause: err}
+			}
 		}
 
 		state.LastStep = "01_download"

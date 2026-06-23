@@ -20,6 +20,7 @@ func New(taskService TaskService) *Handler {
 // RegisterTools registers all YouTube analyzer MCP tools on the provided server.
 func (h *Handler) RegisterTools(s *server.MCPServer) {
 	h.registerAddVideo(s)
+	h.registerAddLocalVideo(s)
 	h.registerGetStatus(s)
 	h.registerGetResult(s)
 	h.registerGetArtifacts(s)

@@ -23,6 +23,9 @@ type State struct {
 	Warnings        []model.Warning       `json:"warnings"`
 	TempDir         string                `json:"temp_dir"`
 	LastStep        string                `json:"last_step"`
+	IsLocal         bool                  `json:"is_local,omitempty"`
+	LocalPath       string                `json:"local_path,omitempty"`
+	LocalTitle      string                `json:"local_title,omitempty"`
 }
 
 // Save persists the state checkpoint to disk.

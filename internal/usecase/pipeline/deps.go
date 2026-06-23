@@ -16,6 +16,8 @@ type Transcriber interface {
 
 type FrameExtractor interface {
 	ExtractFrames(ctx context.Context, videoPath, outputDir string) ([]model.Frame, error)
+	ExtractAudio(ctx context.Context, videoPath, outputPath string) error
+	GetDuration(ctx context.Context, videoPath string) float64
 }
 
 type FrameClassifier interface {

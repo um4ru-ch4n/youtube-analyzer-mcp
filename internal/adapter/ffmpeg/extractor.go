@@ -79,6 +79,36 @@ func (e *Extractor) dynamicMinFrames(durationSec float64) int {
 	return expected
 }
 
+// GetDuration uses ffprobe to read video duration in seconds. Returns 0 on failure.
+func (e *Extractor) GetDuration(ctx context.Context, videoPath string) float64 {
+	return e.getVideoDuration(ctx, videoPath)
+}
+
+// ExtractAudio decodes video audio into a 16 kHz mono PCM .wav matching the
+// format yt-dlp produces, so the rest of the pipeline can stay source-agnostic.
+func (e *Extractor) ExtractAudio(ctx context.Context, videoPath, outputPath string) error {
+	args := []string{
+		"-y",
+		"-i", videoPath,
+		"-vn",
+		"-acodec", "pcm_s16le",
+		"-ar", "16000",
+		"-ac", "1",
+		outputPath,
+	}
+
+	cmd := exec.CommandContext(ctx, "ffmpeg", args...)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil {
+		e.logger.Error("ffmpeg audio extraction failed", zap.String("stderr", stderr.String()))
+		return fmt.Errorf("ffmpeg extract audio: %w", err)
+	}
+
+	return nil
+}
+
 // getVideoDuration uses ffprobe to get video duration in seconds.
 func (e *Extractor) getVideoDuration(ctx context.Context, videoPath string) float64 {
 	args := []string{
