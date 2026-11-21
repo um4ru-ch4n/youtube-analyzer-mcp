@@ -21,22 +21,23 @@ internal/
 ├── config/config.go             — viper config.yaml + env vars
 ├── handler/mcp/                 — transport layer (MCP request → DTO → service → response)
 │   ├── deps.go                  — TaskService interface
-│   ├── handler.go               — Handler + RegisterTools (6 tools)
+│   ├── handler.go               — Handler + RegisterTools (7 tools)
 │   ├── add_video.go             — submit video URL
 │   ├── get_status.go            — poll task progress
 │   ├── get_result.go            — text summaries + artifact metadata (no images)
 │   ├── get_artifacts.go         — images for a specific chunk by index
 │   ├── delete_task.go           — remove task + artifacts
 │   ├── retry_task.go            — re-enqueue failed task from checkpoint
+│   ├── list_videos.go           — list completed tasks for cross-session discovery
 │   └── helpers.go
 ├── service/task/                — TaskManager: queue + worker pool
 │   ├── deps.go                  — TaskRepository, PipelineRunner interfaces
-│   ├── manager.go               — Submit, GetStatus, GetResult, Delete, Retry
+│   ├── manager.go               — Submit, GetStatus, GetResult, Delete, Retry, ListVideos
 │   └── worker.go
 ├── service/chunking/            — time-based chunking (30-sec chunks)
 ├── usecase/pipeline/            — pipeline orchestrator + steps
 │   ├── deps.go                  — all adapter interfaces
-│   ├── runner.go                — orchestrator (parallel fan-out, checkpoint/resume)
+│   ├── runner.go                — orchestrator (parallel fan-out, checkpoint/resume, post-success cleanup)
 │   ├── state.go                 — PipelineState + checkpoint persistence
 │   ├── step_download.go         — yt-dlp (video + audio + subtitles)
 │   ├── step_transcribe.go       — subtitles first, Whisper fallback
@@ -55,7 +56,7 @@ internal/
 │   ├── vision/                  — Gemini/Claude API (IsUsefulFrame doklassification)
 │   └── summarizer/              — Ollama HTTP client (speaker-voice compression)
 ├── model/                       — domain models
-│   ├── task.go                  — Task, TaskStatus, TaskResult, Warning
+│   ├── task.go                  — Task, TaskStatus, TaskResult, Warning, VideoSummary
 │   ├── video.go                 — VideoMeta, DownloadResult (with SubtitlesPath)
 │   ├── frame.go                 — Frame, ProcessedFrame (Useful, OCRText, ImagePath)
 │   ├── chunk.go                 — Chunk, ChunkSummary, Artifact
@@ -75,6 +76,8 @@ Two parallel branches:
 2. **Visual branch:** FFmpeg frames → pHash dedup → CLIP classify → discard talking_head → OCR for slide/code → Vision API doklassification for diagram/other → keep useful frames as Artifacts
 
 Results merged by timestamp. Artifacts returned via separate `get_artifacts` tool to save tokens.
+
+On successful completion: `processing/` dir and `checkpoint.json` are auto-deleted (result is in DB). Failed tasks keep their checkpoint for retry.
 
 ## Commands
 
@@ -124,14 +127,14 @@ Claude Code config (`~/.claude.json`):
 data/tasks/{task_id}/
 ├── video.mp4, audio.wav, subs.en.vtt
 ├── frames/                    — extracted frames (JPG)
-├── processing/                — intermediate results (JSON)
+├── processing/                — intermediate results (JSON, deleted after success)
 │   ├── transcript.json        — subtitle/whisper segments
 │   ├── frames_deduped.json    — after pHash
 │   ├── frames_classified.json — after CLIP + OCR
 │   ├── chunks.json            — transcript chunks
 │   ├── summaries.json         — summaries + artifacts
 │   └── result.json            — final result
-└── checkpoint.json            — pipeline resume point
+└── checkpoint.json            — pipeline resume point (deleted after success)
 ```
 
 ## Current Limitations
