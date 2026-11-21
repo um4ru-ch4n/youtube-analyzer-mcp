@@ -12,17 +12,26 @@ import (
 	"github.com/um4ru-ch4n/youtube-analyzer-mcp/internal/model"
 )
 
+// Decoding holds server-wide Whisper decoding defaults sent with every request.
+type Decoding struct {
+	VADFilter               bool
+	VADMinSilenceMs         int
+	ConditionOnPreviousText bool
+}
+
 type Transcriber struct {
 	httpClient *http.Client
 	baseURL    string
+	decoding   Decoding
 }
 
-func New(url string, timeoutSec int) *Transcriber {
+func New(url string, timeoutSec int, decoding Decoding) *Transcriber {
 	return &Transcriber{
 		httpClient: &http.Client{
 			Timeout: time.Duration(timeoutSec) * time.Second,
 		},
-		baseURL: url,
+		baseURL:  url,
+		decoding: decoding,
 	}
 }
 
@@ -31,6 +40,10 @@ type transcribeRequest struct {
 	Language      string `json:"language,omitempty"`
 	InitialPrompt string `json:"initial_prompt,omitempty"`
 	Hotwords      string `json:"hotwords,omitempty"`
+
+	VADFilter               bool `json:"vad_filter"`
+	VADMinSilenceMs         int  `json:"vad_min_silence_ms,omitempty"`
+	ConditionOnPreviousText bool `json:"condition_on_previous_text"`
 }
 
 type transcribeResponse struct {
@@ -50,6 +63,10 @@ func (t *Transcriber) Transcribe(ctx context.Context, audioPath string, opts mod
 		Language:      opts.Language,
 		InitialPrompt: opts.InitialPrompt,
 		Hotwords:      opts.Hotwords,
+
+		VADFilter:               t.decoding.VADFilter,
+		VADMinSilenceMs:         t.decoding.VADMinSilenceMs,
+		ConditionOnPreviousText: t.decoding.ConditionOnPreviousText,
 	})
 	if err != nil {
 		return model.Transcript{}, fmt.Errorf("marshal request: %w", err)

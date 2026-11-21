@@ -52,6 +52,11 @@ Download (yt-dlp) → video + audio + subtitles
 `glossary` (comma-separated terms passed to Whisper as hotwords), `initial_prompt`,
 `frame_dedup_threshold` (CLIP dedup, default 0.95; higher keeps more frames, 1 disables).
 
+Whisper decoding defaults live in `config.yaml` (`whisper.vad_filter`, `vad_min_silence_ms`,
+`condition_on_previous_text`): VAD on and no conditioning on previous text. On Russian lectures
+this removed repetition loops, invented numbers and silence tails ("Продолжение следует...").
+`glossary` (hotwords) made them worse — use a short `initial_prompt` with the terms instead.
+
 **Typical flow:**
 1. `add_video(url)` → get `task_id`
 2. Poll `get_status(task_id)` until `completed`

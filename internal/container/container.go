@@ -68,7 +68,11 @@ func New(cfg *config.Config, env *config.EnvConfig) (*Container, error) {
 		FallbackInterval: cfg.Pipeline.FallbackIntervalSec,
 	}, zapLogger)
 
-	transcriber := whisper.New(cfg.Whisper.URL, cfg.Whisper.TimeoutSec)
+	transcriber := whisper.New(cfg.Whisper.URL, cfg.Whisper.TimeoutSec, whisper.Decoding{
+		VADFilter:               cfg.Whisper.VADFilter,
+		VADMinSilenceMs:         cfg.Whisper.VADMinSilenceMs,
+		ConditionOnPreviousText: cfg.Whisper.ConditionOnPreviousText,
+	})
 
 	classifier := clip.New(cfg.Clip.URL, cfg.Clip.TimeoutSec)
 

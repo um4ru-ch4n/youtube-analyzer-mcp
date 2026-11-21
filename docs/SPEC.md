@@ -366,6 +366,9 @@ whisper:
   url: "http://whisper:8001"
   timeout_sec: 300
   model: "large-v3-turbo"
+  vad_filter: true                   # Silero VAD: no decoding on silence
+  vad_min_silence_ms: 1000
+  condition_on_previous_text: false  # stops repetition loops
 
 clip:
   url: "http://clip:8002"

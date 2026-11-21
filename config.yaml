@@ -22,6 +22,9 @@ whisper:
   url: "http://whisper:8001"
   timeout_sec: 300
   model: "large-v3-turbo"
+  vad_filter: true
+  vad_min_silence_ms: 1000
+  condition_on_previous_text: false
 
 clip:
   url: "http://clip:8002"

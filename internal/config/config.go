@@ -51,6 +51,12 @@ type WhisperConfig struct {
 	URL        string `mapstructure:"url"`
 	TimeoutSec int    `mapstructure:"timeout_sec"`
 	Model      string `mapstructure:"model"`
+	// VADFilter drops non-speech audio before decoding (cuts hallucinations on silence).
+	VADFilter bool `mapstructure:"vad_filter"`
+	// VADMinSilenceMs is the minimum silence that splits speech when VADFilter is on.
+	VADMinSilenceMs int `mapstructure:"vad_min_silence_ms"`
+	// ConditionOnPreviousText feeds the previous window's text as a prompt; false stops repetition loops.
+	ConditionOnPreviousText bool `mapstructure:"condition_on_previous_text"`
 }
 
 type ClipConfig struct {

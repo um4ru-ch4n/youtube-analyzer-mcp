@@ -19,7 +19,8 @@ func withTaskOptions(base ...mcp.ToolOption) []mcp.ToolOption {
 			mcp.Description("Force Whisper language, ISO code (e.g. ru, en). Default: auto-detect."),
 		),
 		mcp.WithString("glossary",
-			mcp.Description("Comma-separated domain terms passed to Whisper as hotwords to improve spelling (e.g. \"Uniswap, USDC, AMM\")."),
+			mcp.Description("Comma-separated domain terms passed to Whisper as hotwords on every window. "+
+				"Use with care: on long Russian lectures hotwords caused repetition loops and invented text; prefer initial_prompt."),
 		),
 		mcp.WithString("initial_prompt",
 			mcp.Description("Whisper initial prompt: a short punctuated sample in the target language; helps punctuation and terms at the start."),

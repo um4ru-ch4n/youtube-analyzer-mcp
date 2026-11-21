@@ -31,6 +31,10 @@ class TranscribeRequest(BaseModel):
     language: str | None = None
     initial_prompt: str | None = None
     hotwords: str | None = None
+    # Defaults keep the pre-VAD behaviour for clients that do not send these fields.
+    vad_filter: bool = False
+    vad_min_silence_ms: int = 2000
+    condition_on_previous_text: bool = True
 
 
 class Segment(BaseModel):
@@ -50,11 +54,15 @@ def transcribe(req: TranscribeRequest):
         raise HTTPException(status_code=400, detail=f"File not found: {req.audio_path}")
 
     log.info(
-        "Transcribing %s language=%s initial_prompt=%d chars hotwords=%d chars",
+        "Transcribing %s language=%s initial_prompt=%d chars hotwords=%d chars "
+        "vad=%s min_silence=%dms condition_on_previous_text=%s",
         req.audio_path,
         req.language or "auto",
         len(req.initial_prompt or ""),
         len(req.hotwords or ""),
+        req.vad_filter,
+        req.vad_min_silence_ms,
+        req.condition_on_previous_text,
     )
 
     segments_iter, info = model.transcribe(
@@ -63,6 +71,11 @@ def transcribe(req: TranscribeRequest):
         language=req.language or None,
         initial_prompt=req.initial_prompt or None,
         hotwords=req.hotwords or None,
+        vad_filter=req.vad_filter,
+        vad_parameters={"min_silence_duration_ms": req.vad_min_silence_ms, "speech_pad_ms": 400}
+        if req.vad_filter
+        else None,
+        condition_on_previous_text=req.condition_on_previous_text,
     )
 
     segments = []
