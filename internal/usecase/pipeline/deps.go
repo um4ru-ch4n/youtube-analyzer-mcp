@@ -11,7 +11,7 @@ type Downloader interface {
 }
 
 type Transcriber interface {
-	Transcribe(ctx context.Context, audioPath string) (model.Transcript, error)
+	Transcribe(ctx context.Context, audioPath string, opts model.TranscribeOptions) (model.Transcript, error)
 }
 
 type FrameExtractor interface {
@@ -36,7 +36,7 @@ type VisionAnalyzer interface {
 }
 
 type Summarizer interface {
-	SummarizeChunk(ctx context.Context, videoTitle string, transcriptText string, compressionRatio int) (string, error)
+	SummarizeChunk(ctx context.Context, videoTitle, transcriptText, language string, compressionRatio int) (string, error)
 }
 
 type Deduplicator interface {

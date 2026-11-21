@@ -30,6 +30,7 @@ func Migrate(db *sql.DB) error {
 		`ALTER TABLE tasks ADD COLUMN duration_seconds REAL NOT NULL DEFAULT 0`,
 		`ALTER TABLE tasks ADD COLUMN chunk_count INTEGER NOT NULL DEFAULT 0`,
 		`ALTER TABLE tasks ADD COLUMN processing_seconds REAL NOT NULL DEFAULT 0`,
+		`ALTER TABLE tasks ADD COLUMN options_json TEXT NOT NULL DEFAULT '{}'`,
 	} {
 		if err := execIdempotentAlter(db, stmt); err != nil {
 			return fmt.Errorf("migration add_video_meta: %w", err)

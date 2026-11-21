@@ -11,11 +11,27 @@ import (
 )
 
 func (r *Runner) summarize(ctx context.Context, state *State) error {
-	logger.InfoKV(ctx, "summarizing chunks", "task_id", state.TaskID, "chunk_count", len(state.Chunks))
+	logger.InfoKV(ctx, "summarizing chunks",
+		"task_id", state.TaskID,
+		"chunk_count", len(state.Chunks),
+		"skip_summary", state.Options.SkipSummary,
+	)
 
 	summaries := make([]model.ChunkSummary, 0, len(state.Chunks))
 
 	for _, ch := range state.Chunks {
+		artifacts := matchArtifacts(state.ProcessedFrames, ch.TimeStart, ch.TimeEnd)
+
+		if state.Options.SkipSummary {
+			summaries = append(summaries, model.ChunkSummary{
+				Index:     ch.Index,
+				TimeStart: ch.TimeStart,
+				TimeEnd:   ch.TimeEnd,
+				Artifacts: artifacts,
+			})
+			continue
+		}
+
 		var sb strings.Builder
 		for _, seg := range ch.Segments {
 			sb.WriteString(seg.Text)
@@ -27,7 +43,7 @@ func (r *Runner) summarize(ctx context.Context, state *State) error {
 			compressionRatio = 5
 		}
 
-		summary, err := r.summarizer.SummarizeChunk(ctx, state.VideoMeta.Title, sb.String(), compressionRatio)
+		summary, err := r.summarizer.SummarizeChunk(ctx, state.VideoMeta.Title, sb.String(), state.Transcript.Language, compressionRatio)
 		if err != nil {
 			logger.WarnKV(ctx, "chunk summarization failed, using empty summary",
 				"task_id", state.TaskID,
@@ -43,8 +59,6 @@ func (r *Runner) summarize(ctx context.Context, state *State) error {
 
 			summary = ""
 		}
-
-		artifacts := matchArtifacts(state.ProcessedFrames, ch.TimeStart, ch.TimeEnd)
 
 		summaries = append(summaries, model.ChunkSummary{
 			Index:     ch.Index,

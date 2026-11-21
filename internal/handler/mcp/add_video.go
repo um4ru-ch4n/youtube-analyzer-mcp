@@ -11,7 +11,7 @@ import (
 
 func (h *Handler) registerAddVideo(s *server.MCPServer) {
 	s.AddTool(
-		mcp.NewTool("add_video",
+		mcp.NewTool("add_video", withTaskOptions(
 			mcp.WithDescription(
 				"Add a YouTube video to the analysis queue. "+
 					"The server will download the video, extract audio transcript and key frames, "+
@@ -22,7 +22,7 @@ func (h *Handler) registerAddVideo(s *server.MCPServer) {
 				mcp.Required(),
 				mcp.Description("YouTube video URL (e.g. https://youtube.com/watch?v=...)"),
 			),
-		),
+		)...),
 		h.handleAddVideo,
 	)
 }
@@ -33,9 +33,14 @@ func (h *Handler) handleAddVideo(ctx context.Context, req mcp.CallToolRequest) (
 		return toErrorResult(err), nil
 	}
 
-	logger.Logger().Infow("add_video: submitting video", "url", url)
+	opts, err := parseTaskOptions(req)
+	if err != nil {
+		return toErrorResult(err), nil
+	}
 
-	taskID, err := h.taskService.Submit(ctx, url)
+	logger.Logger().Infow("add_video: submitting video", "url", url, "options", opts)
+
+	taskID, err := h.taskService.Submit(ctx, url, opts)
 	if err != nil {
 		logger.Logger().Errorw("add_video: failed to submit video", "url", url, "error", err.Error())
 		return toErrorResult(err), nil

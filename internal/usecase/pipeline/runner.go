@@ -121,6 +121,9 @@ func (r *Runner) Run(ctx context.Context, task model.Task) (model.TaskResult, er
 		}
 	}
 
+	// Options come from the task row so a retry picks up the stored settings.
+	state.Options = task.Options
+
 	// Step 1: Source acquisition (skip if already done).
 	if state.LastStep < "01_download" {
 		if err := r.updateStatus(ctx, state, model.TaskStatusDownloading); err != nil {
@@ -211,8 +214,10 @@ func (r *Runner) Run(ctx context.Context, task model.Task) (model.TaskResult, er
 
 	// Step 5: Summarize
 	if state.LastStep < "05_summarize" {
-		if err := r.updateStatus(ctx, state, model.TaskStatusSummarizing); err != nil {
-			return model.TaskResult{}, err
+		if !state.Options.SkipSummary {
+			if err := r.updateStatus(ctx, state, model.TaskStatusSummarizing); err != nil {
+				return model.TaskResult{}, err
+			}
 		}
 
 		if err := r.summarize(ctx, state); err != nil {
@@ -286,6 +291,8 @@ func (r *Runner) buildResult(state *State) model.TaskResult {
 		VideoMeta:       state.VideoMeta,
 		Chunks:          state.Summaries,
 		FullTranscript:  sb.String(),
+		Segments:        state.Transcript.Segments,
+		Language:        state.Transcript.Language,
 		TotalFrames:     len(state.Frames),
 		DurationSeconds: state.VideoMeta.DurationSeconds,
 	}

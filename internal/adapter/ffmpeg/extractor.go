@@ -162,13 +162,16 @@ func (e *Extractor) extractWithSceneDetect(ctx context.Context, videoPath, outpu
 }
 
 func (e *Extractor) extractWithInterval(ctx context.Context, videoPath, outputDir string) ([]model.Frame, error) {
+	// select keeps the first real frame of every interval and showinfo logs its
+	// pts_time; fps=1/N would pick mid-interval frames and shift timestamps.
 	pattern := filepath.Join(outputDir, "frame_%04d.jpg")
-	filter := fmt.Sprintf("fps=1/%d", e.cfg.FallbackInterval)
+	filter := fmt.Sprintf(`select='isnan(prev_selected_t)+gte(t-prev_selected_t\,%d)',showinfo`, e.cfg.FallbackInterval)
 
 	args := []string{
 		"-y",
 		"-i", videoPath,
 		"-vf", filter,
+		"-vsync", "vfr",
 		pattern,
 	}
 
@@ -183,7 +186,7 @@ func (e *Extractor) extractWithInterval(ctx context.Context, videoPath, outputDi
 		return nil, fmt.Errorf("ffmpeg interval extract: %w", err)
 	}
 
-	return e.collectFramesFromFilenames(outputDir)
+	return e.collectFrames(outputDir, stderr.String())
 }
 
 var ptsTimeRegex = regexp.MustCompile(`pts_time:(\d+\.?\d*)`)
@@ -217,39 +220,6 @@ func (e *Extractor) collectFrames(outputDir, stderrOutput string) ([]model.Frame
 			FilePath:     filepath.Join(outputDir, entry.Name()),
 		})
 		frameIdx++
-	}
-
-	sort.Slice(frames, func(i, j int) bool {
-		return frames[i].TimestampSec < frames[j].TimestampSec
-	})
-
-	return frames, nil
-}
-
-func (e *Extractor) collectFramesFromFilenames(outputDir string) ([]model.Frame, error) {
-	entries, err := os.ReadDir(outputDir)
-	if err != nil {
-		return nil, fmt.Errorf("read output dir: %w", err)
-	}
-
-	var frames []model.Frame
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		matched, _ := filepath.Match("frame_*.jpg", entry.Name())
-		if !matched {
-			continue
-		}
-
-		var idx int
-		_, _ = fmt.Sscanf(entry.Name(), "frame_%d.jpg", &idx)
-		ts := float64((idx - 1) * e.cfg.FallbackInterval)
-
-		frames = append(frames, model.Frame{
-			TimestampSec: ts,
-			FilePath:     filepath.Join(outputDir, entry.Name()),
-		})
 	}
 
 	sort.Slice(frames, func(i, j int) bool {

@@ -25,6 +25,8 @@ internal/
 │   ├── add_video.go             — submit video URL
 │   ├── get_status.go            — poll task progress
 │   ├── get_result.go            — text summaries + artifact metadata (no images)
+│   ├── get_transcript.go        — timestamped transcript segments
+│   ├── task_options.go          — per-task options (skip_summary, language, glossary, initial_prompt, frame_dedup_threshold)
 │   ├── get_artifacts.go         — images for a specific chunk by index
 │   ├── delete_task.go           — remove task + artifacts
 │   ├── retry_task.go            — re-enqueue failed task from checkpoint

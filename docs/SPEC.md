@@ -111,6 +111,16 @@ Add video to processing queue.
 { "url": "https://youtube.com/watch?v=..." }
 ```
 
+Optional task options (also for `add_local_video`, stored in `tasks.options_json` and reused on retry):
+
+| Field | Type | Meaning |
+|---|---|---|
+| `skip_summary` | bool | Skip LLM summarization; chunks keep empty `summary` |
+| `language` | string | Force Whisper language (ISO code) |
+| `glossary` | string | Comma-separated terms → Whisper `hotwords` (every window) |
+| `initial_prompt` | string | Whisper initial prompt (first window context) |
+| `frame_dedup_threshold` | number | CLIP embedding dedup threshold override; `>= 1` disables |
+
 **Output:**
 ```json
 { "task_id": "550e8400-e29b-41d4-a716-446655440000" }
@@ -172,6 +182,11 @@ Get analysis result for completed task.
   ]
 }
 ```
+
+### `get_transcript`
+Full transcript of a completed task: `{task_id, language, source, segments[{start_sec,end_sec,text}]}`.
+Tasks completed before segments were stored return `source: "plain"` and `full_transcript` only.
+`format: "text"` returns `[HH:MM:SS] text` lines.
 
 ### `delete_task`
 Delete task and all its artifacts. Only for `completed` or `failed` tasks.

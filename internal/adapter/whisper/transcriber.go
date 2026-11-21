@@ -27,7 +27,10 @@ func New(url string, timeoutSec int) *Transcriber {
 }
 
 type transcribeRequest struct {
-	AudioPath string `json:"audio_path"`
+	AudioPath     string `json:"audio_path"`
+	Language      string `json:"language,omitempty"`
+	InitialPrompt string `json:"initial_prompt,omitempty"`
+	Hotwords      string `json:"hotwords,omitempty"`
 }
 
 type transcribeResponse struct {
@@ -41,8 +44,13 @@ type segmentResponse struct {
 	Text  string  `json:"text"`
 }
 
-func (t *Transcriber) Transcribe(ctx context.Context, audioPath string) (model.Transcript, error) {
-	reqBody, err := json.Marshal(transcribeRequest{AudioPath: audioPath})
+func (t *Transcriber) Transcribe(ctx context.Context, audioPath string, opts model.TranscribeOptions) (model.Transcript, error) {
+	reqBody, err := json.Marshal(transcribeRequest{
+		AudioPath:     audioPath,
+		Language:      opts.Language,
+		InitialPrompt: opts.InitialPrompt,
+		Hotwords:      opts.Hotwords,
+	})
 	if err != nil {
 		return model.Transcript{}, fmt.Errorf("marshal request: %w", err)
 	}

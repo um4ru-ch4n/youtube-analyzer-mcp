@@ -3,8 +3,10 @@ package pipeline
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/um4ru-ch4n/youtube-analyzer-mcp/internal/adapter/subtitle"
+	"github.com/um4ru-ch4n/youtube-analyzer-mcp/internal/model"
 	"github.com/um4ru-ch4n/youtube-analyzer-mcp/pkg/logger"
 )
 
@@ -51,7 +53,13 @@ func (r *Runner) transcribeWithWhisper(ctx context.Context, state *State) error 
 		"audio_path", state.DownloadResult.AudioPath,
 	)
 
-	transcript, err := r.transcriber.Transcribe(ctx, state.DownloadResult.AudioPath)
+	opts := model.TranscribeOptions{
+		Language:      state.Options.Language,
+		InitialPrompt: state.Options.InitialPrompt,
+		Hotwords:      strings.Join(state.Options.Glossary, ", "),
+	}
+
+	transcript, err := r.transcriber.Transcribe(ctx, state.DownloadResult.AudioPath, opts)
 	if err != nil {
 		return fmt.Errorf("transcribe audio: %w", err)
 	}

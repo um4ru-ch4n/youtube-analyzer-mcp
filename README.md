@@ -39,10 +39,18 @@ Download (yt-dlp) → video + audio + subtitles
 |------|-------------|
 | `add_video` | Submit YouTube URL for analysis. Returns `task_id` instantly. |
 | `get_status` | Poll task progress: downloading → transcribing → processing_frames → summarizing → completed |
+| `add_local_video` | Submit a file already placed in `uploads/` (`/data/uploads/...`) |
 | `get_result` | Get text summaries + artifact metadata (lightweight, no images) |
+| `get_transcript` | Get the transcript with per-segment timestamps (`format=text` for `[HH:MM:SS] text` lines) |
+| `list_videos` | List completed tasks |
 | `get_artifacts` | Get images for a specific chunk by index (for deep dive) |
 | `delete_task` | Remove task and all artifacts |
 | `retry_task` | Re-run a failed task from last checkpoint (skips completed steps) |
+
+`add_video` and `add_local_video` accept optional per-task settings:
+`skip_summary` (no LLM step — the slowest one), `language` (force Whisper language),
+`glossary` (comma-separated terms passed to Whisper as hotwords), `initial_prompt`,
+`frame_dedup_threshold` (CLIP dedup, default 0.95; higher keeps more frames, 1 disables).
 
 **Typical flow:**
 1. `add_video(url)` → get `task_id`

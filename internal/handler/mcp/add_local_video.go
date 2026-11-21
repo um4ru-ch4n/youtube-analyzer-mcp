@@ -24,7 +24,7 @@ var allowedLocalExts = map[string]struct{}{
 
 func (h *Handler) registerAddLocalVideo(s *server.MCPServer) {
 	s.AddTool(
-		mcp.NewTool("add_local_video",
+		mcp.NewTool("add_local_video", withTaskOptions(
 			mcp.WithDescription(
 				"Add an already-uploaded local video file to the analysis queue. "+
 					"The file must live inside the server's uploads directory "+
@@ -39,7 +39,7 @@ func (h *Handler) registerAddLocalVideo(s *server.MCPServer) {
 			mcp.WithString("title",
 				mcp.Description("Optional human-readable title; defaults to the filename without extension."),
 			),
-		),
+		)...),
 		h.handleAddLocalVideo,
 	)
 }
@@ -56,9 +56,14 @@ func (h *Handler) handleAddLocalVideo(ctx context.Context, req mcp.CallToolReque
 
 	title, _ := req.GetArguments()["title"].(string)
 
-	logger.Logger().Infow("add_local_video: submitting", "path", path, "title", title)
+	opts, err := parseTaskOptions(req)
+	if err != nil {
+		return toErrorResult(err), nil
+	}
 
-	taskID, err := h.taskService.SubmitLocal(ctx, path, title)
+	logger.Logger().Infow("add_local_video: submitting", "path", path, "title", title, "options", opts)
+
+	taskID, err := h.taskService.SubmitLocal(ctx, path, title, opts)
 	if err != nil {
 		logger.Logger().Errorw("add_local_video: submit failed", "path", path, "error", err.Error())
 		return toErrorResult(err), nil

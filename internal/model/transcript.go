@@ -12,3 +12,10 @@ type Transcript struct {
 	Segments []TranscriptSegment `json:"segments"`
 	Language string              `json:"language"`
 }
+
+// TranscribeOptions tune a single Whisper transcription.
+type TranscribeOptions struct {
+	Language      string
+	InitialPrompt string
+	Hotwords      string
+}

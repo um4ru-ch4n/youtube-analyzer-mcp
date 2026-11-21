@@ -28,6 +28,9 @@ app = FastAPI(title="Whisper Sidecar")
 
 class TranscribeRequest(BaseModel):
     audio_path: str
+    language: str | None = None
+    initial_prompt: str | None = None
+    hotwords: str | None = None
 
 
 class Segment(BaseModel):
@@ -46,9 +49,21 @@ def transcribe(req: TranscribeRequest):
     if not os.path.exists(req.audio_path):
         raise HTTPException(status_code=400, detail=f"File not found: {req.audio_path}")
 
-    log.info("Transcribing %s", req.audio_path)
+    log.info(
+        "Transcribing %s language=%s initial_prompt=%d chars hotwords=%d chars",
+        req.audio_path,
+        req.language or "auto",
+        len(req.initial_prompt or ""),
+        len(req.hotwords or ""),
+    )
 
-    segments_iter, info = model.transcribe(req.audio_path, beam_size=5)
+    segments_iter, info = model.transcribe(
+        req.audio_path,
+        beam_size=5,
+        language=req.language or None,
+        initial_prompt=req.initial_prompt or None,
+        hotwords=req.hotwords or None,
+    )
 
     segments = []
     for seg in segments_iter:

@@ -48,7 +48,7 @@ func (m *Manager) Start(ctx context.Context) {
 }
 
 // Submit creates a new task for the given video URL and enqueues it for processing.
-func (m *Manager) Submit(ctx context.Context, videoURL string) (string, error) {
+func (m *Manager) Submit(ctx context.Context, videoURL string, opts model.TaskOptions) (string, error) {
 	taskID := uuid.New().String()
 
 	now := time.Now().UTC()
@@ -57,6 +57,7 @@ func (m *Manager) Submit(ctx context.Context, videoURL string) (string, error) {
 		VideoURL:  videoURL,
 		Status:    model.TaskStatusQueued,
 		Progress:  string(model.TaskStatusQueued),
+		Options:   opts,
 		CreatedAt: now,
 		UpdatedAt: now,
 	}
@@ -79,7 +80,7 @@ func (m *Manager) Submit(ctx context.Context, videoURL string) (string, error) {
 // SubmitLocal queues an already-uploaded local file for analysis. The path is
 // encoded as `file://<path>#title=<urlencoded>` so the pipeline runner can
 // recover both fields without widening the Task model or the worker queue.
-func (m *Manager) SubmitLocal(ctx context.Context, path, title string) (string, error) {
+func (m *Manager) SubmitLocal(ctx context.Context, path, title string, opts model.TaskOptions) (string, error) {
 	taskID := uuid.New().String()
 
 	encoded := "file://" + path
@@ -95,6 +96,7 @@ func (m *Manager) SubmitLocal(ctx context.Context, path, title string) (string, 
 		VideoURL:  encoded,
 		Status:    model.TaskStatusQueued,
 		Progress:  string(model.TaskStatusQueued),
+		Options:   opts,
 		CreatedAt: now,
 		UpdatedAt: now,
 	}

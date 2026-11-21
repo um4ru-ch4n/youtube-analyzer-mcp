@@ -33,7 +33,11 @@ func (r *Runner) processFrames(ctx context.Context, state *State) error {
 	classified := r.classifyAll(ctx, state, maxConcurrent)
 
 	// Phase 2: dedup by cosine similarity on embeddings.
-	deduped := r.dedupByEmbedding(ctx, state.TaskID, classified)
+	threshold := r.cfg.EmbeddingDedupThreshold
+	if state.Options.FrameDedupThreshold > 0 {
+		threshold = state.Options.FrameDedupThreshold
+	}
+	deduped := r.dedupByEmbedding(ctx, state.TaskID, classified, threshold)
 
 	// Phase 3: heavy work (OCR / Vision API) only on survivors.
 	processed := r.runHeavySteps(ctx, state, deduped, maxConcurrent)
@@ -123,9 +127,8 @@ func (r *Runner) classifyAll(ctx context.Context, state *State, maxConcurrent in
 // Frames without an embedding (classification failed) and talking_head frames
 // are passed through untouched: talking_head gets dropped later (Useful=false)
 // and we don't want to use its embedding as a dedup anchor against real slides.
-func (r *Runner) dedupByEmbedding(ctx context.Context, taskID string, frames []classifiedFrame) []classifiedFrame {
-	threshold := r.cfg.EmbeddingDedupThreshold
-	if threshold <= 0 || len(frames) == 0 {
+func (r *Runner) dedupByEmbedding(ctx context.Context, taskID string, frames []classifiedFrame, threshold float64) []classifiedFrame {
+	if threshold <= 0 || threshold >= 1 || len(frames) == 0 {
 		return frames
 	}
 

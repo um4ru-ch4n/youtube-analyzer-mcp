@@ -11,21 +11,22 @@ import (
 
 // State carries data between pipeline steps.
 type State struct {
-	TaskID          string                `json:"task_id"`
-	VideoURL        string                `json:"video_url"`
-	VideoMeta       model.VideoMeta       `json:"video_meta"`
-	DownloadResult  model.DownloadResult  `json:"download_result"`
-	Transcript      model.Transcript      `json:"transcript"`
-	Frames          []model.Frame         `json:"frames"`
+	TaskID          string                 `json:"task_id"`
+	VideoURL        string                 `json:"video_url"`
+	VideoMeta       model.VideoMeta        `json:"video_meta"`
+	DownloadResult  model.DownloadResult   `json:"download_result"`
+	Transcript      model.Transcript       `json:"transcript"`
+	Frames          []model.Frame          `json:"frames"`
 	ProcessedFrames []model.ProcessedFrame `json:"processed_frames"`
-	Chunks          []model.Chunk         `json:"chunks"`
-	Summaries       []model.ChunkSummary  `json:"summaries"`
-	Warnings        []model.Warning       `json:"warnings"`
-	TempDir         string                `json:"temp_dir"`
-	LastStep        string                `json:"last_step"`
-	IsLocal         bool                  `json:"is_local,omitempty"`
-	LocalPath       string                `json:"local_path,omitempty"`
-	LocalTitle      string                `json:"local_title,omitempty"`
+	Chunks          []model.Chunk          `json:"chunks"`
+	Summaries       []model.ChunkSummary   `json:"summaries"`
+	Warnings        []model.Warning        `json:"warnings"`
+	TempDir         string                 `json:"temp_dir"`
+	LastStep        string                 `json:"last_step"`
+	IsLocal         bool                   `json:"is_local,omitempty"`
+	LocalPath       string                 `json:"local_path,omitempty"`
+	LocalTitle      string                 `json:"local_title,omitempty"`
+	Options         model.TaskOptions      `json:"options"`
 }
 
 // Save persists the state checkpoint to disk.

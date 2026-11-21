@@ -59,11 +59,16 @@ func (r *Repository) Create(ctx context.Context, task model.Task) error {
 		return fmt.Errorf("marshal warnings: %w", err)
 	}
 
+	optionsJSON, err := json.Marshal(task.Options)
+	if err != nil {
+		return fmt.Errorf("marshal options: %w", err)
+	}
+
 	_, err = r.db.ExecContext(ctx,
-		`INSERT INTO tasks (id, video_url, status, progress, error, warnings_json, result_json, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, '', ?, ?)`,
+		`INSERT INTO tasks (id, video_url, status, progress, error, warnings_json, options_json, result_json, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, '', ?, ?)`,
 		task.ID, task.VideoURL, string(task.Status), task.Progress, task.Error,
-		string(warningsJSON), task.CreatedAt.UTC(), task.UpdatedAt.UTC(),
+		string(warningsJSON), string(optionsJSON), task.CreatedAt.UTC(), task.UpdatedAt.UTC(),
 	)
 	if err != nil {
 		return fmt.Errorf("insert task: %w", err)
@@ -75,16 +80,16 @@ func (r *Repository) Create(ctx context.Context, task model.Task) error {
 // Get retrieves a task by ID. Returns model.ErrTaskNotFound if the task does not exist.
 func (r *Repository) Get(ctx context.Context, taskID string) (model.Task, error) {
 	row := r.db.QueryRowContext(ctx,
-		`SELECT id, video_url, status, progress, error, warnings_json, created_at, updated_at
+		`SELECT id, video_url, status, progress, error, warnings_json, options_json, created_at, updated_at
 		 FROM tasks WHERE id = ?`, taskID,
 	)
 
 	var t model.Task
 	var status string
-	var warningsJSON string
+	var warningsJSON, optionsJSON string
 	var createdAt, updatedAt string
 
-	err := row.Scan(&t.ID, &t.VideoURL, &status, &t.Progress, &t.Error, &warningsJSON, &createdAt, &updatedAt)
+	err := row.Scan(&t.ID, &t.VideoURL, &status, &t.Progress, &t.Error, &warningsJSON, &optionsJSON, &createdAt, &updatedAt)
 	if err == sql.ErrNoRows {
 		return model.Task{}, model.ErrTaskNotFound
 	}
@@ -96,6 +101,11 @@ func (r *Repository) Get(ctx context.Context, taskID string) (model.Task, error)
 
 	if err := json.Unmarshal([]byte(warningsJSON), &t.Warnings); err != nil {
 		return model.Task{}, fmt.Errorf("unmarshal warnings: %w", err)
+	}
+
+	err = json.Unmarshal([]byte(optionsJSON), &t.Options)
+	if err != nil {
+		return model.Task{}, fmt.Errorf("unmarshal options: %w", err)
 	}
 
 	t.CreatedAt, err = time.Parse("2006-01-02 15:04:05+00:00", createdAt)
@@ -211,7 +221,7 @@ func (r *Repository) Delete(ctx context.Context, taskID string) error {
 // List returns tasks ordered by creation time descending, with limit and offset.
 func (r *Repository) List(ctx context.Context, limit, offset int) ([]model.Task, error) {
 	rows, err := r.db.QueryContext(ctx,
-		`SELECT id, video_url, status, progress, error, warnings_json, created_at, updated_at
+		`SELECT id, video_url, status, progress, error, warnings_json, options_json, created_at, updated_at
 		 FROM tasks ORDER BY created_at DESC LIMIT ? OFFSET ?`, limit, offset,
 	)
 	if err != nil {
@@ -223,10 +233,10 @@ func (r *Repository) List(ctx context.Context, limit, offset int) ([]model.Task,
 	for rows.Next() {
 		var t model.Task
 		var status string
-		var warningsJSON string
+		var warningsJSON, optionsJSON string
 		var createdAt, updatedAt string
 
-		if err := rows.Scan(&t.ID, &t.VideoURL, &status, &t.Progress, &t.Error, &warningsJSON, &createdAt, &updatedAt); err != nil {
+		if err := rows.Scan(&t.ID, &t.VideoURL, &status, &t.Progress, &t.Error, &warningsJSON, &optionsJSON, &createdAt, &updatedAt); err != nil {
 			return nil, fmt.Errorf("scan task row: %w", err)
 		}
 
@@ -234,6 +244,11 @@ func (r *Repository) List(ctx context.Context, limit, offset int) ([]model.Task,
 
 		if err := json.Unmarshal([]byte(warningsJSON), &t.Warnings); err != nil {
 			return nil, fmt.Errorf("unmarshal warnings: %w", err)
+		}
+
+		err = json.Unmarshal([]byte(optionsJSON), &t.Options)
+		if err != nil {
+			return nil, fmt.Errorf("unmarshal options: %w", err)
 		}
 
 		t.CreatedAt, _ = parseTime(createdAt)

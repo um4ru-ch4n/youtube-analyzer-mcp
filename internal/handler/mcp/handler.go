@@ -23,6 +23,7 @@ func (h *Handler) RegisterTools(s *server.MCPServer) {
 	h.registerAddLocalVideo(s)
 	h.registerGetStatus(s)
 	h.registerGetResult(s)
+	h.registerGetTranscript(s)
 	h.registerGetArtifacts(s)
 	h.registerDeleteTask(s)
 	h.registerRetryTask(s)

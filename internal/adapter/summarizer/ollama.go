@@ -37,8 +37,8 @@ type ollamaResponse struct {
 	Response string `json:"response"`
 }
 
-func (s *OllamaSummarizer) SummarizeChunk(ctx context.Context, videoTitle string, transcriptText string, compressionRatio int) (string, error) {
-	prompt := buildPrompt(videoTitle, transcriptText, compressionRatio)
+func (s *OllamaSummarizer) SummarizeChunk(ctx context.Context, videoTitle, transcriptText, language string, compressionRatio int) (string, error) {
+	prompt := buildPrompt(videoTitle, transcriptText, language, compressionRatio)
 
 	reqBody := ollamaRequest{
 		Model:  s.model,
@@ -77,7 +77,7 @@ func (s *OllamaSummarizer) SummarizeChunk(ctx context.Context, videoTitle string
 	return strings.TrimSpace(result.Response), nil
 }
 
-func buildPrompt(videoTitle string, transcriptText string, compressionRatio int) string {
+func buildPrompt(videoTitle, transcriptText, language string, compressionRatio int) string {
 	wordCount := len(strings.Fields(transcriptText))
 	targetWords := wordCount / compressionRatio
 	if targetWords < 20 {
@@ -96,8 +96,27 @@ func buildPrompt(videoTitle string, transcriptText string, compressionRatio int)
 	sb.WriteString("- Remove filler words, repetitions, and tangents, but keep the substance\n")
 	sb.WriteString(fmt.Sprintf("- Target length: approximately %d words (compress %dx from original)\n", targetWords, compressionRatio))
 	sb.WriteString("- Output ONLY the compressed text, no headers or explanations\n")
+	sb.WriteString(languageRule(language))
 	sb.WriteString("\n## Original transcript:\n")
 	sb.WriteString(transcriptText)
 
 	return sb.String()
+}
+
+var languageNames = map[string]string{
+	"ru": "Russian",
+	"en": "English",
+	"uk": "Ukrainian",
+	"de": "German",
+	"es": "Spanish",
+	"fr": "French",
+}
+
+// languageRule pins the output language to the transcript language.
+func languageRule(language string) string {
+	name, ok := languageNames[language]
+	if !ok {
+		return "- Write in the same language as the original transcript; do not translate\n"
+	}
+	return fmt.Sprintf("- Write in %s, the language of the original transcript; do not translate and do not switch languages\n", name)
 }
